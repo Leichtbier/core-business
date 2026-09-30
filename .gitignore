@@ -1,0 +1,6 @@
+# Python-Cache der Blender-Skripte (enthält absolute Pfade des eigenen Rechners)
+__pycache__/
+*.pyc
+# Vorschaubilder der Blender-Skripte (--preview pod.png) und Screenshots im Hauptordner, lokale Notizen
+/*.png
+feature.txt

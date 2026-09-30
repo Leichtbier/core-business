@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><title>Endgegner-Vorschau</title>
+<base href="../"><!-- Modelle werden relativ zum Projektordner geladen -->
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/addons/" } }</script>
+<style>
+  body { margin: 0; background: #1a0d08; color: #f3e6d6; font-family: "Trebuchet MS", sans-serif; overflow: hidden; }
+  #ui { position: fixed; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  button { background: #3a2a1c; color: #f3e6d6; border: 1px solid #5a3a20; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button.on { background: #e08a20; color: #1a0f06; }
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<script type="module">
+// Vorschau der Endgegner-Modelle (assets/husk_boss.glb) mit prozeduralen Posen über die Gelenk-Empties.
+// Parameter: ?pose=walk|melee|ranged|fire|idle&t=Sekunden (feste Zeit für Screenshots)
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a140c);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0.3, 2.4, 10);
+camera.lookAt(0.3, 2.0, 0);
+scene.add(new THREE.HemisphereLight(0xffd9b8, 0x5a2a18, 1.4));
+const sun = new THREE.DirectionalLight(0xfff0dd, 2.2);
+sun.position.set(-4, 8, 6);
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 20), new THREE.MeshStandardMaterial({ color: 0x5a2a1a }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const gltf = await new GLTFLoader().loadAsync('assets/husk_boss.glb');
+const p1 = gltf.scene.getObjectByName('Husk_P1'), p2 = gltf.scene.getObjectByName('Husk_P2');
+p1.position.x = -1.8;
+p2.position.x = 1.8;
+for (const r of [p1, p2]) r.rotation.y = -0.6;
+const boss = new THREE.Group();
+boss.add(p1, p2);
+scene.add(boss);
+const J = (n) => boss.getObjectByName(n);
+const rest = new Map();
+boss.traverse((o) => rest.set(o, o.rotation.clone()));
+
+let pose = q.get('pose') || 'walk';
+const ui = document.getElementById('ui');
+for (const name of ['idle', 'walk', 'melee', 'ranged', 'fire']) {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => { pose = name; for (const x of ui.children) x.classList.toggle('on', x === b); };
+  if (name === pose) b.classList.add('on');
+  ui.appendChild(b);
+}
+
+function animate(t) {
+  for (const [o, r] of rest) o.rotation.copy(r);
+  for (const P of ['P1_', 'P2_']) {
+    const goat = P === 'P2_';
+    const walk = pose === 'walk' ? 1 : 0.15;
+    const w = t * (goat ? 3.2 : 4.5);
+    // Beine: Hüfte schwingt, Knie beugt (Bocksbein andersherum), Fuß gleicht aus
+    for (const [s, ph] of [['L', 0], ['R', Math.PI]]) {
+      const a = Math.sin(w + ph) * 0.45 * walk;
+      J(P + 'Leg' + s).rotation.x = a;
+      J(P + 'Shin' + s).rotation.x = (goat ? -1 : 1) * Math.max(0, Math.sin(w + ph + 1.2)) * 0.6 * walk;
+      J(P + 'Foot' + s).rotation.x = -a * 0.5;
+      J(P + 'Arm' + s).rotation.x = -a * 0.7;
+      J(P + 'Forearm' + s).rotation.x = -0.25 - Math.max(0, -a) * 0.4;
+    }
+    J(P + 'Hips').position.y = (goat ? 2.0 : 1.35) + Math.abs(Math.sin(w)) * 0.05 * walk;
+    J(P + 'Torso').rotation.y = Math.sin(w) * 0.08 * walk;
+    J(P + 'Head').rotation.z = Math.sin(t * 1.3) * 0.06;
+  }
+  // Angriffe Phase 1: Stab-Schlag (rechter Arm hoch und nieder) bzw. Laser (Kopf nach vorn, Monokel)
+  const k = (t * 1.2) % 1;
+  if (pose === 'melee') {
+    const swing = k < 0.5 ? -2.6 * (k / 0.5) : -2.6 + 3.2 * Math.min(1, (k - 0.5) / 0.15);
+    J('P1_ArmR').rotation.x = swing;
+    J('P1_Torso').rotation.x = k < 0.5 ? -0.1 : 0.25;
+  }
+  if (pose === 'ranged') {
+    J('P1_Head').rotation.x = 0.15;
+    J('P1_Torso').rotation.y = -0.4;
+    J('P1_ArmL').rotation.z = 0.4;
+  }
+  // Phase 2: Feuerwurf aus dem Boiler (Oberkörper holt aus), Schwanz peitscht
+  if (pose === 'fire') {
+    J('P2_Torso').rotation.x = k < 0.6 ? -0.25 * (k / 0.6) : 0.35;
+    J('P2_ArmL').rotation.z = 0.8; J('P2_ArmR').rotation.z = -0.8;
+  }
+  J('P2_Tail').rotation.z = Math.sin(t * 2.3) * 0.35;
+  boss.traverse((o) => {
+    if (o.isMesh && /Glow|EvilEye/.test(o.material.name)) o.material.emissiveIntensity = 1 + 0.4 * Math.sin(t * 7);
+  });
+}
+
+const fixed = q.has('t') ? +q.get('t') : null;
+const t0 = performance.now();
+renderer.setAnimationLoop(() => {
+  animate(fixed ?? (performance.now() - t0) / 1000);
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

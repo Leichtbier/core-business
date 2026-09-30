@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Husk-Posen</title>
+  <base href="../">
+  <script type="importmap">{ "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/addons/" } }</script>
+  <style>body { margin: 0; background: #444; display: flex; flex-wrap: wrap; font: 12px sans-serif; color: #fff; }
+    div { width: 240px; text-align: center; } canvas { width: 240px; height: 270px; background: #c23a1e; display: block; }</style>
+</head>
+<body>
+<script type="module">
+// Probe-Posen für die Werbetafel: welche Gelenkachse hebt den Arm nach vorne (auf den Betrachter)?
+import { Portrait3D, RECRUITER_POSE } from './src/portrait3d.js';
+const p = new Portrait3D();
+await p.load();
+const tries = {
+  'Werbetafel': RECRUITER_POSE,
+  'x -1.4': { ArmL: [-1.4, 0, 0] },
+  'x +1.4': { ArmL: [1.4, 0, 0] },
+  'y -1.4': { ArmL: [0, -1.4, 0] },
+  'y +1.4': { ArmL: [0, 1.4, 0] },
+  'z -1.4': { ArmL: [0, 0, -1.4] },
+  'z +1.4': { ArmL: [0, 0, 1.4] },
+  'R x -1.4': { ArmR: [-1.4, 0, 0] },
+};
+for (const [name, pose] of Object.entries(tries)) {
+  const d = document.createElement('div');
+  d.textContent = name;
+  d.appendChild(p.snapshotRecruiter(480, 540, pose));
+  document.body.appendChild(d);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Tod ohne Hänger</title>
+<base href="../"><!-- Modelle werden relativ zum Projektordner geladen -->
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/addons/" } }</script>
+</head>
+<body style="margin:0">
+<canvas id="view" style="width:800px;height:500px"></canvas>
+<pre id="out">läuft…</pre>
+<script type="module">
+// Prüft, dass der Tod des Pods (und ein Teleport) keine Shader neu übersetzen lässt: das würde das Spiel
+// für einen Moment einfrieren. Gemessen wird die Zahl der Shader-Programme vor und nach dem Ereignis.
+import { Game } from './src/sim.js';
+import { Renderer } from './src/render.js';
+import { scenes } from './test/scenes.js';
+
+const log = [];
+const ok = (c, m) => log.push((c ? 'OK   ' : 'FAIL ') + m);
+try {
+  const r = new Renderer(document.getElementById('view'));
+  await r.loadAssets();
+  const game = new Game({ left: false, right: false, up: false, down: false }, new Proxy({}, { get: () => () => {} }));
+  scenes.deep(game);
+  const frame = () => { game.pod.prevX = game.pod.x; game.pod.prevY = game.pod.y; game.step(); r.render(game, 1, 1 / 42); };
+  for (let i = 0; i < 40; i++) frame();
+  const programs = () => r.renderer.info.programs.length;
+
+  // leerer Tank: nach 99 Frames explodiert der Pod
+  game.pod.fuel = 0;
+  let deathAt = -1, atDeath = 0, changes = [];
+  for (let i = 0; i < 130; i++) {
+    const wasDead = game.dead, pc = programs();
+    frame();
+    if (programs() !== pc) changes.push(`Frame ${i}: ${pc} -> ${programs()}${game.dead ? ' (tot)' : ''}`);
+    if (!wasDead && game.dead) { deathAt = i; atDeath = pc; }
+  }
+  log.push(`Tod nach ${deathAt + 1} Frames leerem Tank; Shader-Änderungen: ${changes.join(', ') || 'keine'}`);
+  ok(deathAt >= 97 && deathAt <= 100, 'Tod nach 99 Frames leerem Tank (wie im Original)');
+  ok(programs() === atDeath, `beim Tod werden keine Shader neu übersetzt (${atDeath} -> ${programs()})`);
+  ok(changes.length === 0, 'auch in den Frames davor keine Neuübersetzung');
+
+  // Gegenprobe: altes Verhalten (ganzer Pod samt Lichtern unsichtbar) würde Shader neu übersetzen
+  {
+    const pc = programs();
+    r.pod.root.visible = false;
+    r.render(game, 1, 1 / 42);
+    const hidden = programs();
+    r.pod.root.visible = true;
+    r.render(game, 1, 1 / 42);
+    log.push(`Gegenprobe: Pod-Lichter aus der Szene genommen -> Shader ${pc} -> ${hidden} (wieder da: ${programs()})`);
+    ok(hidden > pc, 'Gegenprobe bestätigt: fehlende Lichter erzwingen neue Shader (so hing das Spiel früher)');
+  }
+
+  // Materietransmitter: Pod verschwindet und taucht wieder auf
+  const g2 = new Game({ left: false, right: false, up: false, down: false }, {
+    itemUsed: (i) => r.itemFx.start(i, g2), teleport: () => r.itemFx.teleported(),
+  });
+  scenes.deep(g2);
+  g2.items.fill(1);
+  const f2 = () => { g2.pod.prevX = g2.pod.x; g2.pod.prevY = g2.pod.y; g2.step(); r.render(g2, 1, 1 / 42); };
+  for (let i = 0; i < 30; i++) f2();
+  const b2 = programs();
+  g2.useItem(5);
+  for (let i = 0; i < 110; i++) f2();
+  ok(programs() === b2, `Teleport ohne neue Shader (${b2} -> ${programs()})`);
+
+  // C4 im Fels: Brocken brechen in einzelne Stücke (eigenes Material), das darf keine Shader neu übersetzen
+  const g3 = new Game({ left: false, right: false, up: false, down: false }, {
+    itemUsed: (i) => r.itemFx.start(i, g3), blast: (id, cleared) => r.blastDebris(cleared, g3.pod.x, g3.pod.y, 1.4),
+  });
+  scenes.boulders(g3);
+  g3.items.fill(1);
+  const f3 = () => { g3.pod.prevX = g3.pod.x; g3.pod.prevY = g3.pod.y; g3.step(); r.render(g3, 1, 1 / 42); };
+  for (let i = 0; i < 30; i++) f3();
+  const b3 = programs();
+  g3.itemTimer = 99;
+  g3.useItem(3);
+  let maxDebris = 0;
+  for (let i = 0; i < 90; i++) { f3(); maxDebris = Math.max(maxDebris, r.debris.length); }
+  ok(maxDebris > 20, `Felsbrocken brechen auseinander (${maxDebris} Stücke in der Luft)`);
+  ok(programs() === b3, `Sprengung im Fels ohne neue Shader (${b3} -> ${programs()})`);
+  for (let i = 0; i < 200; i++) f3();
+  ok(r.debris.length === 0, 'alle Stücke sind danach zerbröselt');
+} catch (e) {
+  log.push('EXCEPTION ' + e.stack);
+}
+document.getElementById('out').textContent = log.join('\n');
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Sprach-Test</title></head>
+<body>
+<pre id="out">läuft…</pre>
+<iframe id="f" width="1100" height="760"></iframe>
+<script type="module">
+// Mehrsprachigkeit: de.js hat dieselben Schlüssel wie en.js (gleiche Art, gleiche Listenlängen), die Namenslisten
+// passen zu src/constants.js, und Shops, HUD und Shop-Meldungen erscheinen im Spiel in der gewählten Sprache.
+import en from '../src/lang/en.js';
+import de from '../src/lang/de.js';
+import { MINERALS, ITEMS, UPGRADES, TRANSMISSIONS } from '../src/constants.js';
+
+const log = [];
+const ok = (cond, msg) => log.push((cond ? 'OK   ' : 'FAIL ') + msg);
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const open = (query) => new Promise((resolve) => { frame.onload = () => resolve(); frame.src = '../index.html?dev&' + query; });
+const $ = (id) => frame.contentDocument.getElementById(id);
+const visible = (id) => !$(id).classList.contains('hidden');
+const until = async (cond, ms = 60000) => { const t = performance.now(); while (!cond() && performance.now() - t < ms) await sleep(50); return cond(); };
+
+// Unterschiede zwischen zwei Sprachständen (Pfad → Grund)
+function diff(a, b, path = '') {
+  const out = [];
+  const kind = (v) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v);
+  if (kind(a) !== kind(b)) return [`${path || '(Wurzel)'}: ${kind(a)} ≠ ${kind(b)}`];
+  if (kind(a) === 'array' && a.length !== b.length) out.push(`${path}: Länge ${a.length} ≠ ${b.length}`);
+  if (kind(a) === 'array' || kind(a) === 'object') {
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const p = path ? `${path}.${k}` : k;
+      if (!(k in b)) out.push(`${p}: fehlt in de.js`);
+      else if (!(k in a)) out.push(`${p}: fehlt in en.js`);
+      else out.push(...diff(a[k], b[k], p));
+    }
+  }
+  return out;
+}
+
+try {
+  const d = diff(en, de);
+  ok(d.length === 0, 'de.js und en.js haben dieselben Schlüssel' + (d.length ? ': ' + d.join('; ') : ''));
+  for (const [name, L] of [['en', en], ['de', de]]) {
+    ok(L.minerals.length === MINERALS.length, `${name}: ${L.minerals.length} Mineralnamen`);
+    ok(L.items.length === ITEMS.length && L.items.every((it) => it.name && it.desc), `${name}: ${L.items.length} Items mit Name und Beschreibung`);
+    ok(Object.keys(UPGRADES).every((k) => L.upgrades[k]?.names.length === UPGRADES[k].names.length), `${name}: Upgrade-Namen je Stufe`);
+    ok(L.transmissions.length === TRANSMISSIONS.length, `${name}: ${L.transmissions.length} Funksprüche`);
+  }
+
+  // Upgrade-Shop auf Deutsch: Titel, Reiter, Stufennamen, Einheit, HUD
+  await open('lang=de&autostart&scene=upgradeView&shop=upgrade&cash=100000');
+  await until(() => visible('shop') && $('shopBody').querySelector('.tabs'));
+  const tabs = [...$('shopBody').querySelectorAll('.tabs button')].map((b) => b.textContent);
+  ok(tabs[0] === 'BOHRER' && tabs.includes('LADERAUM'), 'Upgrade-Reiter deutsch: ' + tabs.join(', '));
+  ok($('shopBody').querySelector('.name').textContent === 'Standardbohrer', 'Stufe 0: ' + $('shopBody').querySelector('.name').textContent);
+  ok(frame.contentDocument.documentElement.lang === 'de', '<html lang="de">');
+  ok($('hud').querySelector('.label').textContent === 'TANK', 'HUD-Beschriftung: ' + $('hud').querySelector('.label').textContent);
+  const { ui } = frame.contentWindow.ml3d;
+  ui.setUpgradeTab('engine');
+  ok($('shopBody').querySelector('.stat').textContent.endsWith('PS'), 'Motorleistung in PS: ' + $('shopBody').querySelector('.stat').textContent);
+  $('shopBody').querySelector('[data-nav="up-1"]').click();
+  ok($('shopMsg').textContent === 'V4 1600 cm³ eingebaut!', 'Kaufmeldung: ' + $('shopMsg').textContent);
+  $('shopBody').querySelector('[data-nav="up-1"]').click();
+  ok($('shopMsg').textContent === 'Dieses Upgrade ist schon eingebaut!', 'Fehlermeldung: ' + $('shopMsg').textContent);
+
+  // Werkstatt: Items mit deutschem Namen, Beschreibung und Kaufmeldung
+  await open('lang=de&autostart&scene=upgradeView&shop=repair&cash=100000');
+  await until(() => visible('shop') && $('shopBody').querySelector('.item'));
+  ok($('shopTitle').textContent === 'REPARATURWERKSTATT', 'Shop-Titel: ' + $('shopTitle').textContent);
+  $('shopBody').querySelector('[data-nav="item-2"]').click();
+  ok($('shopMsg').textContent === 'Dynamit gekauft. (Einsatz mit »X«)', 'Item-Kauf: ' + $('shopMsg').textContent);
+  ok($('itemBar').children[0].title === 'Reservetank', 'Item-Leiste: ' + $('itemBar').children[0].title);
+
+  // Mineralankauf auf Deutsch: Mineralnamen in der Tabelle
+  await open('lang=de&autostart&scene=cargo&shop=sell');
+  await until(() => visible('shop') && $('shopBody').querySelector('table'));
+  const names = [...$('shopBody').querySelectorAll('td:first-child')].map((td) => td.textContent.trim()).filter(Boolean);
+  ok(names.includes('Ironium') && $('shopBody').querySelector('th').textContent === 'MINERAL', 'Verkaufstabelle: ' + names.slice(0, 4).join(', '));
+
+  // Gegenprobe Englisch
+  await open('lang=en&autostart&scene=upgradeView&shop=fuel&cash=500');
+  await until(() => visible('shop') && $('shopBody').querySelector('button'));
+  ok($('shopTitle').textContent === 'FUEL STATION' && $('hud').querySelector('.label').textContent === 'FUEL', 'Englisch: ' + $('shopTitle').textContent);
+  $('shopBody').querySelector('[data-nav="fuel-5"]').click();
+  ok(/^\$\d+ of fuel purchased\.$/.test($('shopMsg').textContent), 'Englische Meldung: ' + $('shopMsg').textContent);
+} catch (e) {
+  log.push('EXCEPTION ' + e.stack);
+}
+document.getElementById('out').textContent = log.join('\n');
+frame.remove();
+</script>
+</body>
+</html>

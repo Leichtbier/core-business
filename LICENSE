@@ -1,0 +1,37 @@
+MIT License
+
+Copyright (c) 2026 Leichtbier
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+Exceptions – not covered by the MIT License above:
+
+1. Audio: the sound effects in assets/sounds/ and the music in assets/music/ were
+   generated with ElevenLabs. They are provided for use within this project only
+   (playing and running Core Business, including unmodified forks of it). No
+   license is granted to use, extract or redistribute them separately.
+
+2. Third-party code: lib/ contains three.js, licensed under its own MIT License
+   (see lib/LICENSE).
+
+3. "Motherload" is a trademark of XGen Studios. This fan project is not
+   affiliated with XGen Studios, and this license grants no rights to the name
+   or to the original game.

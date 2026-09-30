@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Speicher-Test</title></head>
+<body>
+<pre id="out">läuft…</pre>
+<iframe id="f" width="1000" height="700"></iframe>
+<script type="module">
+// Ende-zu-Ende: am Save-Pod speichern (Taste J), Spiel neu laden und mit L den Stand laden.
+// Ein vorhandener Spielstand wird vorher gesichert und am Ende zurückgeschrieben.
+const KEY = 'ml3d.savegame';
+const log = [];
+const ok = (cond, msg) => log.push((cond ? 'OK   ' : 'FAIL ') + msg);
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const errors = [];
+const open = (query) => new Promise((resolve) => {
+  frame.onload = () => {
+    // Fehler im Spiel mitprotokollieren (sonst bleibt nur ein leeres HUD)
+    frame.contentWindow.addEventListener('error', (e) => errors.push(e.message));
+    frame.contentWindow.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.stack || e.reason)));
+    resolve();
+  };
+  // Englisch erzwingen, damit eine im Browser gespeicherte Sprachwahl die Textprüfungen nicht stört
+  frame.src = '../index.html' + (query ? query.replace('?', '?dev&lang=en&') : '?dev&lang=en');
+});
+const doc = () => frame.contentDocument;
+const until = async (cond, ms = 20000) => { const t = performance.now(); while (!cond() && performance.now() - t < ms) await sleep(50); return cond(); };
+const key = (code) => frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+
+const backup = localStorage.getItem(KEY);
+try {
+  localStorage.removeItem(KEY);
+  // 1. ohne Spielstand: L zeigt nur einen Hinweis
+  await open('');
+  await until(() => !doc().getElementById('startScreen').classList.contains('hidden'));
+  key('KeyL');
+  ok(doc().getElementById('loadInfo').textContent.includes('No saved game') &&
+    !doc().getElementById('startScreen').classList.contains('hidden'), 'Ohne Spielstand: Hinweis, Spiel startet nicht');
+
+  // 2. Save-Pod anfliegen und speichern
+  await open('?autostart&scene=savePod&nodrop&keys=right&warp=60&cash=4242');
+  ok(await until(() => !doc().getElementById('saveScreen').classList.contains('hidden')), 'Speicherdialog offen');
+  key('KeyJ');
+  ok(doc().getElementById('saveText').textContent.includes('Game saved'), 'Meldung: gespeichert');
+  const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+  ok(s && s.data.length === 32 && s.data[1] === 4242, 'Spielstand im Browser (Geld 4242)');
+  key('Enter');
+  ok(doc().getElementById('saveScreen').classList.contains('hidden'), 'Enter schließt den Dialog');
+
+  // 3. erneut speichern: überschreibt
+  await open('?autostart&scene=savePod&nodrop&keys=right&warp=60&cash=5151');
+  await until(() => !doc().getElementById('saveScreen').classList.contains('hidden'));
+  key('Enter');
+  ok(doc().getElementById('saveText').textContent.includes('overwritten'), 'Zweites Speichern: überschrieben');
+  key('Escape');
+
+  // 4. Nein: nichts wird geschrieben
+  await open('?autostart&scene=savePod&nodrop&keys=right&warp=60&cash=777');
+  await until(() => !doc().getElementById('saveScreen').classList.contains('hidden'));
+  key('Escape');
+  ok(doc().getElementById('saveScreen').classList.contains('hidden') &&
+    JSON.parse(localStorage.getItem(KEY)).data[1] === 5151, 'Nein: Dialog zu, Stand unverändert');
+
+  // 5. Laden über den Startbildschirm
+  await open('');
+  await until(() => !doc().getElementById('startScreen').classList.contains('hidden'));
+  ok(doc().getElementById('loadInfo').textContent.includes('$5,151'), 'Startbildschirm zeigt den Spielstand');
+  key('KeyL');
+  await until(() => !doc().getElementById('hud').classList.contains('hidden'));
+  // Zustand direkt prüfen: das HUD füllt sich erst im nächsten Animationsframe, die liefert Headless-Edge im iframe kaum
+  const g = frame.contentWindow.ml3d.game;
+  ok(g.cash === 5151 && g.score === 0, 'Geladen: Geld $5,151 (' + g.cash + ')');
+} catch (e) {
+  log.push('EXCEPTION ' + e.stack);
+}
+ok(errors.length === 0, 'keine Fehler im Spiel' + (errors.length ? ': ' + errors.join(' | ') : ''));
+if (backup === null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, backup);
+document.getElementById('out').textContent = log.join('\n');
+frame.remove();
+</script>
+</body>
+</html>

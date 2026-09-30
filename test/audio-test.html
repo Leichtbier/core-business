@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Audio-Test</title></head>
+<body>
+<pre id="out">läuft…</pre>
+<script type="module">
+// 1) Die echten Bohrgeräusche müssen sich dekodieren lassen.
+// 2) Die Planung wird mit einem nachgebauten Audio-Kontext mit steuerbarer Uhr geprüft
+//    (echte Audio-Uhren laufen im Headless-Browser nicht mit der virtuellen Zeit).
+// Headless starten mit --autoplay-policy=no-user-gesture-required.
+import { SoundFX, FUEL_WARN_INTERVAL, MUSIC_LEVEL, seamlessLoop } from '../src/audio.js';
+
+const log = [];
+const show = () => { document.getElementById('out').textContent = log.join('\n'); };
+const ok = (c, m) => { log.push((c ? 'OK   ' : 'FAIL ') + m); show(); };
+
+class FakeParam {
+  constructor(v) { this.value = v; this.events = []; }
+  setValueAtTime(v, t) { this.events.push(['set', v, t]); }
+  linearRampToValueAtTime(v, t) { this.events.push(['ramp', v, t]); }
+  cancelScheduledValues(t) { this.events.push(['cancel', t]); }
+  setTargetAtTime(v, t, c) { this.value = v; this.events.push(['target', v, t, c]); }
+}
+class FakeCtx {
+  constructor() { this.currentTime = 0; this.started = []; }
+  createGain() { return { gain: new FakeParam(1), connect: (n) => n }; }
+  createBufferSource() {
+    const src = { playbackRate: new FakeParam(1), connect: (n) => n, onended: null, stopAt: null };
+    src.start = (t) => { src.startAt = t; this.started.push(src); };
+    src.stop = (t) => { src.stopAt = t; };
+    return src;
+  }
+}
+
+try {
+  const dec = new AudioContext();
+  const files = [1, 2, 3].map((i) => new URL(`../assets/sounds/drill_${i}.wav`, location.href.replace(/test\/[^/]*$/, '')));
+  const buffers = await Promise.all(files.map(async (u) => dec.decodeAudioData(await (await fetch(u)).arrayBuffer())));
+  ok(buffers.length === 3, `3 Bohrgeräusche dekodiert (${buffers.map((b) => b.duration.toFixed(2) + ' s').join(', ')})`);
+
+  const sfx = new SoundFX();
+  const ctx = new FakeCtx();
+  sfx.ctx = ctx;
+  sfx.master = ctx.createGain();
+  sfx.drill = buffers;
+  const variants = [];
+  const orig = sfx.playHit.bind(sfx);
+  sfx.playHit = (when) => { orig(when); variants.push(sfx.lastVariant); };
+
+  // Spielschleife nachbilden: 60 fps, 1.5 s bohren, dann 1 s nicht
+  for (let t = 0; t < 2.5; t += 1 / 60) { ctx.currentTime = t; sfx.update(t < 1.5); }
+  const starts = ctx.started.map((s) => s.startAt);
+  const gaps = starts.slice(1).map((t, i) => t - starts[i]);
+  log.push('Schläge bei: ' + starts.map((t) => t.toFixed(2)).join(' '));
+  ok(starts.length >= 4 && starts.length <= 6, `${starts.length} Schläge in 1.5 s Bohren`);
+  ok(gaps.every((g) => g >= 0.25 && g <= 0.42), 'gleichmäßiger Abstand zwischen 0.25 und 0.42 s');
+  ok(starts.every((t) => t < 1.6), 'kein Schlag nach Ende des Bohrens');
+  ok(variants.every((v, i) => i === 0 || v !== variants[i - 1]), `nie zweimal dieselbe Variante hintereinander (${variants.join(',')})`);
+  ok(ctx.started.filter((s) => s.startAt > 1.0).every((s) => s.stopAt !== null && s.stopAt <= 1.5 + 0.2),
+    'noch klingende Schläge werden beim Bohrende ausgeblendet und gestoppt');
+  const rates = ctx.started.map((s) => s.playbackRate.value);
+  ok(rates.every((r) => r >= 0.94 && r <= 1.06), 'Tonhöhe leicht variiert (0.94–1.06)');
+
+  // Musik: Steuerung mit nachgebautem Audio-Element prüfen
+  // (echte Medienelemente halten im Headless-Browser die virtuelle Zeit an)
+  for (const f of ['main_theme', 'fuel_station']) {
+    const head = await fetch(`../assets/music/${f}.mp3`, { method: 'HEAD' });
+    ok(head.ok, `${f}.mp3 erreichbar (${head.headers.get('content-length')} Bytes)`);
+  }
+  const RealAudio = window.Audio;
+  window.Audio = class {
+    constructor() { this.paused = true; this.currentTime = 0; }
+    play() { this.paused = false; return Promise.resolve(); }
+    pause() { this.paused = true; }
+  };
+  const mctx = new FakeCtx();
+  mctx.createMediaElementSource = () => ({ connect: (n) => n });
+  const mus = new SoundFX();
+  mus.ctx = mctx;
+  mus.initMusic();
+  window.Audio = RealAudio;
+  const main = mus.tracks.main, fuel = mus.tracks.fuel;
+  const lastRamp = (t) => t.gain.gain.events.filter((e) => e[0] === 'ramp').pop()?.[1];
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  ok(main.el.src.endsWith('main_theme.mp3') && fuel.el.src.endsWith('fuel_station.mp3') && main.el.loop && fuel.el.loop,
+    'beide Stücke in Schleife eingestellt');
+
+  mus.setMusic('main', MUSIC_LEVEL.main);
+  ok(!main.el.paused && lastRamp(main) === MUSIC_LEVEL.main && fuel.el.paused, 'Spielen: Hauptthema läuft, Tankstellen-Musik nicht');
+  main.el.currentTime = 42;
+  const n = main.gain.gain.events.length;
+  mus.setMusic('main', MUSIC_LEVEL.main);
+  ok(main.gain.gain.events.length === n, 'gleiche Einstellung erneut: keine neue Rampe');
+
+  fuel.el.currentTime = 30;
+  mus.setMusic('fuel', MUSIC_LEVEL.shopTrack);
+  ok(!fuel.el.paused && fuel.el.currentTime === 0 && lastRamp(fuel) === MUSIC_LEVEL.shopTrack,
+    'Tankstelle betreten: eigenes Stück startet von vorne und wird eingeblendet');
+  ok(lastRamp(main) === 0, 'Hauptthema wird ausgeblendet');
+  await wait(750);
+  ok(main.el.paused, 'Hauptthema nach dem Ausblenden angehalten');
+
+  mus.setMusic('main', MUSIC_LEVEL.main);
+  ok(!main.el.paused && main.el.currentTime === 42 && lastRamp(main) === MUSIC_LEVEL.main,
+    'Tankstelle verlassen: Hauptthema läuft an der alten Stelle weiter');
+  await wait(750);
+  ok(fuel.el.paused, 'Tankstellen-Musik danach angehalten');
+
+  mus.setMusic('main', MUSIC_LEVEL.shop);
+  ok(lastRamp(main) === MUSIC_LEVEL.shop, `Shop ohne eigenes Stück: Hauptthema leiser (${MUSIC_LEVEL.shop})`);
+  mus.setMusic('main', MUSIC_LEVEL.off);
+  ok(lastRamp(main) === 0, 'Pause: ausgeblendet');
+
+  // Stummschalter: gemeinsamer Musikregler, Soundeffekte bleiben unberührt
+  mus.setMusicMuted(true);
+  ok(mus.musicBus.gain.events.filter((e) => e[0] === 'ramp').pop()?.[1] === 0, 'Musik stumm: Musikregler auf 0');
+  mus.setMusicMuted(false);
+  ok(mus.musicBus.gain.events.filter((e) => e[0] === 'ramp').pop()?.[1] === 1, 'Musik wieder an: Musikregler auf 1');
+  const early = new SoundFX();
+  early.setMusicMuted(true);
+  early.ctx = new FakeCtx();
+  window.Audio = class { constructor() { this.paused = true; } };
+  early.ctx.createMediaElementSource = () => ({ connect: (n) => n });
+  early.initMusic();
+  window.Audio = RealAudio;
+  ok(early.musicBus.gain.value === 0, 'vor dem Audiostart gewählte Stummschaltung wird übernommen');
+
+  // Kassensound
+  const buyRes = await fetch(new URL('../assets/sounds/buy.wav', location.href.replace(/test\/[^/]*$/, '')));
+  ok(buyRes.ok, 'buy.wav erreichbar');
+  const kasse = new SoundFX();
+  kasse.ctx = new FakeCtx();
+  kasse.master = kasse.ctx.createGain();
+  kasse.sfx.buy = buffers[0];
+  kasse.playBuy();
+  ok(kasse.ctx.started.length === 1 && kasse.ctx.started[0].buffer === buffers[0], 'Kassensound wird abgespielt');
+
+  // Explosion und Tankwarnung
+  for (const f of ['explosion.wav', 'fuel_low.wav']) {
+    const res = await fetch(new URL('../assets/sounds/' + f, location.href.replace(/test\/[^/]*$/, '')));
+    ok(res.ok, f + ' erreichbar');
+  }
+  const warn = new SoundFX();
+  warn.ctx = new FakeCtx();
+  warn.master = warn.ctx.createGain();
+  warn.sfx.fuelLow = buffers[1];
+  const beeps = (level, seconds) => {
+    const n0 = warn.ctx.started.length;
+    for (let t = 0; t < seconds; t += 1 / 60) { warn.ctx.currentTime += 1 / 60; warn.updateFuelWarning(level); }
+    return warn.ctx.started.length - n0;
+  };
+  const low = beeps(1, 6), empty = beeps(2, 6), off = beeps(0, 3);
+  ok(low >= 5 && low <= 6, `Tank fast leer: ${low} Warntöne in 6 s (alle ${FUEL_WARN_INTERVAL.low} s)`);
+  ok(empty >= 11 && empty <= 13, `Tank leer: ${empty} Warntöne in 6 s (alle ${FUEL_WARN_INTERVAL.empty} s)`);
+  ok(off === 0, 'Tank voll: kein Warnton');
+
+  // Motor: nahtlose Schleife und Lautstärke/Tonhöhe nach Last
+  // Künstlicher Motorton (1 s, 48 kHz) mit ausklingendem Ende wie das echte Sample; echtes Dekodieren
+  // hängt im Headless-Browser nach längerer Laufzeit
+  const engSrc = dec.createBuffer(2, 48000, 48000);
+  for (let c = 0; c < 2; c++) {
+    const d = engSrc.getChannelData(c);
+    for (let i = 0; i < d.length; i++) {
+      const t = i / 48000;
+      d[i] = 0.4 * Math.sin(2 * Math.PI * 57 * t) * Math.sin(2 * Math.PI * 7.3 * t + c) * (t > 0.9 ? (1 - t) * 10 : 1);
+    }
+  }
+  const loop = seamlessLoop(dec, engSrc);
+  const d0 = loop.getChannelData(0), n0 = d0.length;
+  let maxStep = 0;
+  for (let i = 1; i < n0; i++) maxStep = Math.max(maxStep, Math.abs(d0[i] - d0[i - 1]));
+  const seam = Math.abs(d0[0] - d0[n0 - 1]);
+  ok(Math.abs(loop.duration - 0.8) < 0.01, `Motorschleife ${loop.duration.toFixed(2)} s aus ${engSrc.duration.toFixed(2)} s Sample`);
+  ok(seam <= maxStep * 1.2, `Nahtstelle ohne Knacken (Sprung ${seam.toFixed(4)}, größter Sprung im Sample ${maxStep.toFixed(4)})`);
+  const eng = new SoundFX();
+  eng.ctx = new FakeCtx();
+  eng.engine = { playbackRate: new FakeParam(1) };
+  eng.engineGain = { gain: new FakeParam(0) };
+  const probe = (active, load, air) => { eng.updateEngine(active, load, air); return [eng.engineGain.gain.value, eng.engine.playbackRate.value]; };
+  const [vStand, rStand] = probe(true, 100, false);
+  const [vFly, rFly] = probe(true, 130, true);
+  const [vDig] = probe(true, 150, false);
+  const [vOff] = probe(false, 150, false);
+  log.push(`Motor: Stand ${vStand.toFixed(3)} (Tonhöhe ${rStand.toFixed(2)}), Fliegen ${vFly.toFixed(3)} (${rFly.toFixed(2)}), Bohren ${vDig.toFixed(3)}`);
+  ok(vStand < vFly && rStand < rFly, 'im Stand leiser und tiefer als beim Fliegen');
+  ok(vOff === 0, 'im Shop/Pause/Tod stumm');
+} catch (e) {
+  log.push('EXCEPTION ' + e.stack);
+}
+show();
+</script>
+</body>
+</html>

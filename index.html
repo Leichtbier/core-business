@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Core Business</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/addons/" } }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="gauges plate">
+      <div class="gauge">
+        <span class="label" data-i18n="hudFuel">FUEL</span>
+        <div class="bar"><div id="fuelBar" class="fill fuel"></div></div>
+        <span id="fuelText" class="val"></span>
+      </div>
+      <div class="gauge">
+        <span class="label" data-i18n="hudHull">HULL</span>
+        <div class="bar"><div id="hullBar" class="fill hull"></div></div>
+        <span id="hullText" class="val"></span>
+      </div>
+      <div class="gauge">
+        <span class="label" data-i18n="hudCargo">CARGO</span>
+        <div class="bar"><div id="cargoBar" class="fill cargo"></div></div>
+        <span id="cargoText" class="val"></span>
+      </div>
+    </div>
+    <div class="money plate">
+      <div id="cashText" class="cash lcd"></div>
+      <div id="scoreText" class="score"></div>
+    </div>
+    <div id="depthText" class="depth plate"></div>
+    <div id="warnFuel" class="warn hidden">LOW FUEL!</div>
+    <div id="itemBar" class="itembar"></div>
+    <div id="bossBar" class="bossbar plate hidden">
+      <div class="bossName" id="bossName"></div>
+      <div class="bar"><div id="bossFill" class="fill boss"></div></div>
+      <div class="bossHp" id="bossHp"></div>
+    </div>
+  </div>
+
+  <div id="victory" class="overlay hidden">
+    <div class="panel victory">
+      <h1 data-i18n="victory">VICTORY!</h1>
+      <p class="sub" data-i18n="victorySub">Satan is defeated, Mars is free. The loot is yours:</p>
+      <table id="lootList" class="list"></table>
+      <p class="lootTotal"><span data-i18n="balance">BALANCE</span> <span id="lootCash" class="lcd"></span></p>
+      <p class="hint" data-i18n="victoryHint">On to level <b id="nextLevel"></b>: everything is defended more fiercely, minerals are worth less.
+        Upgrades and items are gone, your money stays.</p>
+      <div class="menu"><button id="victoryNext" data-i18n="nextRound" disabled>NEXT ROUND</button></div>
+      <div class="keyhints" data-i18n="victoryHints"><span><kbd>Enter</kbd> continue</span></div>
+    </div>
+  </div>
+  <div id="flash"></div>
+  <!-- Lautstärke: das Symbol klappt die Regler für Musik und Effekte auf (src/main.js, setupVolume) -->
+  <div id="volume">
+    <div id="volPanel" class="plate hidden">
+      <div class="volRow" id="musicRow">
+        <button id="musicMute" class="nonav volMute" tabindex="-1" data-i18n-title="musicMuteTitle" data-i18n-aria="musicMuteTitle">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+          <path class="w1" d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path class="w2" d="M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path class="off" d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <span class="volName" data-i18n="musicLabel">MUSIC</span>
+        <input type="range" id="musicVol" min="0" max="100" step="5" tabindex="-1" data-i18n-aria="musicLabel">
+        <span class="volVal" id="musicVal"></span><kbd>N</kbd>
+      </div>
+      <div class="volRow" id="sfxRow">
+        <button id="sfxMute" class="nonav volMute" tabindex="-1" data-i18n-title="sfxMuteTitle" data-i18n-aria="sfxMuteTitle">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+          <path class="w1" d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path class="w2" d="M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path class="off" d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <span class="volName" data-i18n="sfxLabel">EFFECTS</span>
+        <input type="range" id="sfxVol" min="0" max="100" step="5" tabindex="-1" data-i18n-aria="sfxLabel">
+        <span class="volVal" id="sfxVal"></span><kbd class="spacer"></kbd>
+      </div>
+    </div>
+    <button id="volBtn" class="nonav" tabindex="-1" title="Volume" aria-label="Volume" aria-expanded="false" data-i18n-title="volumeTitle" data-i18n-aria="volumeTitle">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+      <path class="w1" d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path class="w2" d="M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path class="off" d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  </div>
+
+  <div id="floaters"></div>
+
+  <div id="loadScreen" class="overlay solid">
+    <div class="panel title loading">
+      <h1>CORE <span>BUSINESS</span></h1>
+      <div class="loadbar"><div id="loadBar"></div></div>
+      <p id="loadText" class="hint" data-i18n="loading">Loading models and sounds …</p>
+    </div>
+  </div>
+
+  <div id="startScreen" class="overlay hidden">
+    <div class="panel title">
+      <h1>CORE <span>BUSINESS</span></h1>
+      <p class="sub" data-i18n="tagline">A three.js remake of Motherload, the Flash classic by XGen Studios</p>
+      <div class="menu">
+        <button id="startBtn" data-i18n="start">START GAME</button>
+        <button id="loadBtn" data-i18n="load">LOAD GAME</button>
+        <button id="langBtn" data-i18n="langButton">LANGUAGE: ENGLISH</button>
+        <button id="scenarioBtn">TESTSZENARIEN</button>
+      </div>
+      <p id="loadInfo" class="hint"></p>
+      <table class="keys">
+        <tr><td><kbd>←</kbd><kbd>→</kbd> <kbd>A</kbd><kbd>D</kbd></td><td data-i18n="keysDrive">Drive · drill sideways · fly</td></tr>
+        <tr><td><kbd>↑</kbd> <kbd>W</kbd></td><td data-i18n="keysUp">Rotor: take off and fly</td></tr>
+        <tr><td><kbd>↓</kbd> <kbd>S</kbd></td><td data-i18n="keysDown">Drill down</td></tr>
+        <tr><td><kbd>F</kbd><kbd>R</kbd><kbd>X</kbd><kbd>C</kbd><kbd>Q</kbd><kbd>M</kbd></td><td data-i18n="keysItems">Items: reserve tank, nanobots, dynamite, C4, quantum teleporter, matter transmitter</td></tr>
+        <tr><td><kbd>P</kbd> <kbd>N</kbd></td><td data-i18n="keysPause">Pause · music on/off</td></tr>
+        <tr><td data-i18n="keysSaveLabel">Save pod</td><td data-i18n="keysSave">Save the game: fly into the hovering save pod above the surface</td></tr>
+      </table>
+      <p class="hint" data-i18n="intro">Dig up minerals, sell them at the surface, refuel and upgrade your pod.
+        You can't drill upward. Keep an eye on fuel and hull!</p>
+      <div class="keyhints" data-i18n="startHints"><span><kbd>↑</kbd><kbd>↓</kbd> select</span><span><kbd>Enter</kbd> confirm</span><span><kbd>L</kbd> load</span></div>
+    </div>
+  </div>
+
+  <div id="scenarioScreen" class="overlay hidden">
+    <div class="panel scenarios">
+      <h2>TESTSZENARIEN</h2>
+      <div id="scenarioOptions" class="options"></div>
+      <div id="scenarioList"></div>
+      <div class="shopFoot">
+        <span class="hint">Zurück ins Startmenü aus dem Spiel: <kbd>P</kbd> → STARTMENÜ</span>
+        <button id="scenarioBack">ZURÜCK</button>
+      </div>
+      <div class="keyhints"><span><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> Auswahl</span><span><kbd>Enter</kbd> starten / umschalten</span><span><kbd>Esc</kbd> zurück</span></div>
+    </div>
+  </div>
+
+  <div id="pauseScreen" class="overlay hidden">
+    <div class="panel small">
+      <h2>PAUSE</h2>
+      <div class="menu">
+        <button id="resumeBtn" data-i18n="resume">RESUME</button>
+        <button class="menuBtn" data-nav="menu" data-i18n="mainMenu">MAIN MENU</button>
+      </div>
+      <div class="keyhints" data-i18n="pauseHints"><span><kbd>Enter</kbd> confirm</span><span><kbd>P</kbd> <kbd>Esc</kbd> resume</span></div>
+    </div>
+  </div>
+
+  <div id="deathScreen" class="overlay hidden">
+    <div class="panel small danger">
+      <h2 data-i18n="podDestroyed">POD DESTROYED</h2>
+      <p id="deathReason"></p>
+      <p id="deathStats" class="hint"></p>
+      <div class="menu">
+        <button id="deathLoadBtn" class="hidden" data-i18n="loadLast">LOAD LAST SAVE</button>
+        <button id="restartBtn" data-i18n="newGame">NEW GAME</button>
+        <button class="menuBtn" data-nav="menu" data-i18n="mainMenu">MAIN MENU</button>
+      </div>
+      <div class="keyhints" data-i18n="menuHints"><span><kbd>↑</kbd><kbd>↓</kbd> select</span><span><kbd>Enter</kbd> confirm</span></div>
+    </div>
+  </div>
+
+  <div id="transmission" class="overlay hidden">
+    <div class="panel trans" id="transPanel">
+      <h2 class="transHead" id="transHead">INCOMING TRANSMISSION</h2>
+      <div class="transBody">
+        <div class="transAvatar"><div id="transImage"></div><div class="crt"></div><div class="crtBar"></div></div>
+        <div class="transText">
+          <div class="transSender"><b id="transSender"></b><span id="transRole"></span></div>
+          <p id="transMsg"></p>
+        </div>
+      </div>
+      <div class="shopFoot">
+        <span class="hint" data-i18n="transEnd">*** End of transmission *** · press any key to continue</span>
+        <button id="transOk" class="nonav" tabindex="-1" data-i18n="continue" disabled>CONTINUE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveScreen" class="overlay hidden">
+    <div class="panel small savePanel">
+      <h2>SAVE-POD</h2>
+      <p id="saveText"></p>
+      <div class="row">
+        <button id="saveYes" data-i18n="saveYes">YES, SAVE</button>
+        <button id="saveNo" data-i18n="saveNo">NO</button>
+        <button id="saveOk" class="hidden" data-i18n="continue">CONTINUE</button>
+      </div>
+      <div class="keyhints" data-i18n="saveHints"><span><kbd>←</kbd><kbd>→</kbd> select</span><span><kbd>Enter</kbd> confirm</span><span><kbd>Y</kbd> yes</span><span><kbd>N</kbd> <kbd>Esc</kbd> no</span></div>
+    </div>
+  </div>
+
+  <div id="shop" class="overlay hidden">
+    <div class="panel shop" id="shopPanel">
+      <h2 id="shopTitle"></h2>
+      <div id="shopBody"></div>
+      <div id="shopMsg" class="msg"></div>
+      <div class="shopFoot">
+        <span class="wallet"><span data-i18n="balance">BALANCE</span> <span id="shopCash" class="lcd"></span></span>
+        <button id="shopExit" data-nav="exit" data-i18n="leave">LEAVE</button>
+      </div>
+      <div class="keyhints" id="shopHints"></div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

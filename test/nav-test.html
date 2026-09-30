@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Tastatur-Test</title></head>
+<body>
+<pre id="out">läuft…</pre>
+<iframe id="f" width="1100" height="760"></iframe>
+<script type="module">
+// Bedienung nur mit der Tastatur: Vorauswahl je Oberfläche, Pfeiltasten, Enter, Esc, Q/E, P.
+const log = [];
+const ok = (cond, msg) => log.push((cond ? 'OK   ' : 'FAIL ') + msg);
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const open = (query) => new Promise((resolve) => { frame.onload = () => resolve(); frame.src = '../index.html' + (query ? query.replace('?', '?dev&') : '?dev'); });
+const $ = (id) => frame.contentDocument.getElementById(id);
+const visible = (id) => !$(id).classList.contains('hidden');
+const until = async (cond, ms = 20000) => { const t = performance.now(); while (!cond() && performance.now() - t < ms) await sleep(50); return cond(); };
+const key = async (code) => { frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true })); await sleep(30); };
+const sel = (id) => { const s = $(id).querySelector('.sel'); return s ? (s.dataset.nav || s.id) : null; };
+const cash = () => $('shopCash').textContent;
+
+try {
+  // Mineralverarbeitung: "Alles verkaufen" vorausgewählt, danach springt die Auswahl auf "Verlassen"
+  await open('?autostart&scene=cargo&shop=sell');
+  await until(() => visible('shop') && sel('shop'));
+  ok(sel('shop') === 'sell-all', 'Verkauf: "Alles verkaufen" vorausgewählt (' + sel('shop') + ')');
+  await key('Enter');
+  ok(cash() === '$10,300' && sel('shop') === 'exit', 'Enter verkauft alles, Auswahl steht auf "Verlassen" (' + cash() + ')');
+  await key('Enter');
+  ok(!visible('shop'), 'Enter verlässt den Shop');
+
+  // Tankstelle: Volltanken vorausgewählt, Pfeil links wählt $50
+  await open('?autostart&scene=upgradeView&shop=fuel&cash=500');
+  await until(() => visible('shop') && sel('shop'));
+  ok(sel('shop') === 'fuel-full', 'Tankstelle: "Volltanken" vorausgewählt');
+  await key('ArrowLeft');
+  ok(sel('shop') === 'fuel-50', 'Pfeil links: $50');
+  await key('KeyA');
+  ok(sel('shop') === 'fuel-25', 'A (wie links): $25');
+  await key('Escape');
+  ok(!visible('shop'), 'Esc verlässt den Shop');
+
+  // Upgrades: nächste Stufe vorausgewählt, Kauf wählt die folgende, Q/E wechseln die Kategorie
+  await open('?autostart&scene=upgradeView&shop=upgrade&cash=40000&up=drill:2');
+  await until(() => visible('shop') && sel('shop'));
+  ok(sel('shop') === 'up-3', 'Upgrades: nächste Bohrer-Stufe vorausgewählt (' + sel('shop') + ')');
+  await key('Enter');
+  ok(cash() === '$35,000' && sel('shop') === 'up-4', 'Enter kauft, danach ist die nächste Stufe gewählt');
+  await key('KeyE');
+  ok($('shopBody').querySelector('.tabs .active')?.dataset.nav === 'tab-hull' && sel('shop') === 'up-1', 'E: nächste Kategorie (Hülle), Stufe 1 gewählt');
+  await key('KeyQ');
+  ok($('shopBody').querySelector('.tabs .active')?.dataset.nav === 'tab-drill', 'Q: zurück zum Bohrer');
+  await key('ArrowUp'); await key('ArrowUp'); await key('ArrowUp');
+  ok(sel('shop')?.startsWith('tab-'), 'Pfeil hoch erreicht die Kategorien (' + sel('shop') + ')');
+  const before = sel('shop');
+  await key('ArrowRight');
+  const active = $('shopBody').querySelector('.tabs .active')?.dataset.nav;
+  ok(sel('shop') !== before && active === sel('shop'), 'Pfeil rechts auf den Kategorien schaltet um (' + active + ')');
+
+  // Werkstatt ohne Schaden: erstes bezahlbares Item
+  await open('?autostart&scene=repairView&shop=repair&cash=3000');
+  await until(() => visible('shop') && sel('shop'));
+  ok(sel('shop') === 'item-0', 'Werkstatt ohne Schaden: erstes bezahlbares Item (' + sel('shop') + ')');
+  await key('Enter');
+  ok(cash() === '$1,000', 'Enter kauft das Item');
+
+  // Pause: P öffnet, "Fortsetzen" vorausgewählt, Enter spielt weiter; Items wirken nicht, solange das Menü offen ist
+  await open('?autostart&scene=upgradeView&give=1');
+  await sleep(500);
+  await key('KeyP');
+  ok(visible('pauseScreen') && sel('pauseScreen') === 'resumeBtn', 'P: Pause mit "Fortsetzen" vorausgewählt');
+  await key('ArrowDown');
+  ok(sel('pauseScreen') === 'menu', 'Pfeil runter: "Startmenü"');
+  await key('ArrowUp');
+  await key('Enter');
+  ok(!visible('pauseScreen'), 'Enter auf "Fortsetzen": weiter');
+  await key('KeyP'); await key('Escape');
+  ok(!visible('pauseScreen'), 'Esc beendet die Pause');
+
+  // Startbildschirm: Pfeiltasten und Enter öffnen die Testszenarien, Esc kehrt zurück
+  await open('');
+  await until(() => visible('startScreen') && sel('startScreen'));
+  const first = sel('startScreen');
+  ok(first === 'startBtn' || first === 'loadBtn', 'Start: Vorauswahl ' + first);
+  await key('ArrowDown'); await key('ArrowDown'); await key('ArrowDown');
+  ok(sel('startScreen') === 'scenarioBtn', 'Pfeil runter bis "Testszenarien"');
+  await key('Enter');
+  await until(() => visible('scenarioScreen'));
+  ok(sel('scenarioScreen') === 'scn-0', 'Testszenarien: erstes Szenario gewählt');
+  await key('ArrowRight');
+  ok(sel('scenarioScreen') === 'scn-1', 'Pfeil rechts: nächstes Szenario');
+  await key('Escape');
+  await sleep(50);
+  ok(visible('startScreen') && sel('startScreen') === 'scenarioBtn', 'Esc: zurück, Auswahl auf "Testszenarien"');
+
+  // Ohne Testmodus (?dev) gibt es weder die Testszenarien noch Test-Parameter
+  await new Promise((resolve) => { frame.onload = () => resolve(); frame.src = '../index.html?autostart&scene=finds&cash=12345&menu'; });
+  await until(() => visible('startScreen') && sel('startScreen'));
+  ok(!$('scenarioBtn') && !$('scenarioScreen'), 'Ohne Testmodus: kein Knopf "Testszenarien"');
+  ok(!visible('hud') && frame.contentWindow.ml3d.game.cash !== 12345, 'Ohne Testmodus: Test-Parameter werden ignoriert');
+  await key('ArrowDown'); await key('ArrowDown'); await key('ArrowDown');
+  ok(sel('startScreen') === 'langBtn', 'Ohne Testmodus: Pfeil runter endet beim Sprachknopf (' + sel('startScreen') + ')');
+  // Sprache umschalten: Texte wechseln sofort, zweimal umschalten stellt den alten Stand wieder her
+  const label = () => $('startBtn').textContent, langBefore = frame.contentWindow.localStorage.getItem('ml3d.lang');
+  const text0 = label();
+  await key('Enter');
+  const text1 = label();
+  ok(text1 !== text0 && ['START GAME', 'SPIEL STARTEN'].includes(text1), 'Sprachknopf: ' + text0 + ' → ' + text1);
+  await key('Enter');
+  ok(label() === text0, 'Sprachknopf zurück: ' + label());
+  if (langBefore === null) frame.contentWindow.localStorage.removeItem('ml3d.lang');
+} catch (e) {
+  log.push('EXCEPTION ' + e.stack);
+}
+document.getElementById('out').textContent = log.join('\n');
+frame.remove();
+</script>
+</body>
+</html>

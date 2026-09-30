@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Sim-Test</title></head>
+<body>
+<pre id="out">läuft…</pre>
+<script type="module">
+// Headless-Test der Spiellogik: spielt Eingabesequenzen durch und protokolliert den Zustand.
+import { Game } from '../src/sim.js';
+import { checkpoint, scenes } from './scenes.js';
+import { TRANSMISSIONS, MINERALS } from '../src/constants.js';
+
+const log = [];
+const ok = (cond, msg) => log.push((cond ? 'OK   ' : 'FAIL ') + msg);
+const input = { left: false, right: false, up: false, down: false };
+const ev = [];
+const game = new Game(input, new Proxy({}, { get: (_, k) => (...a) => ev.push(k + ' ' + a.join(',')) }));
+let p = game.pod;
+const reset = () => { game.reset(); p = game.pod; };
+const run = (n, keys = {}) => {
+  Object.assign(input, { left: false, right: false, up: false, down: false }, keys);
+  for (let i = 0; i < n; i++) game.step();
+};
+const state = () => `x=${p.x.toFixed(1)} y=${p.y.toFixed(1)} xv=${p.xVel.toFixed(2)} yv=${p.yVel.toFixed(2)} mod=${p.mod} facing=${p.facing} fuel=${p.fuel.toFixed(3)} hp=${p.hp}`;
+
+try {
+  // Welt
+  const w = game.world;
+  const counts = {};
+  for (let y = 6; y < 588; y++) for (let x = 0; x < 36; x++) { const t = w.get(x, y); counts[t] = (counts[t] || 0) + 1; }
+  log.push('Tile-Verteilung: ' + JSON.stringify(counts));
+  ok(w.get(8, 5) === -1 || w.get(8, 5) === -2, 'Gras in Reihe 5 bei x=8');
+  ok(w.get(3, 5) === -4, 'Pflaster vor der Tankstelle');
+
+  // Landung nach dem Abwurf
+  run(200);
+  log.push('nach 200 Frames: ' + state());
+  ok(p.mod === 'ground', 'Pod ist gelandet (mod=ground)');
+  ok(Math.abs(p.y - 205) < 1.5, 'Pod steht auf Reihe 5 (y≈205)');
+  ok(game.depth === 0, 'Höhenmesser zeigt 0 ft an der Oberfläche (' + game.depth + ')');
+
+  // Fahren nach rechts inkl. Wenden, bis in die Mineralverarbeitung (Spalte 10)
+  const x0 = p.x;
+  let f = 0;
+  while (!game.paused && f++ < 200) run(1, { right: true });
+  log.push(`nach ${f} Frames rechts: ` + state());
+  ok(p.facing === 'right', 'Pod hat nach rechts gewendet');
+  ok(game.paused && ev.some((e) => e === 'enterShop sell'), 'Mineralverarbeitung betreten');
+  game.leaveShop();
+  // zurück nach links, weg von den Gebäuden
+  run(12, { left: true });
+  run(80);
+  log.push('nach links gefahren und ausgerollt: ' + state());
+  ok(!game.paused && p.x < x0, 'Pod steht links vom Start');
+
+  // Nach unten bohren, bis ein Tile abgebaut ist
+  const tx = Math.trunc(p.x / 50 + 0.5);
+  const below = w.get(tx, 6);
+  const f0 = game.frame;
+  let dug = 0, frames = 0;
+  while (frames < 1200 && dug < 3 && !game.dead) {
+    run(1, { down: true });
+    frames++;
+    if (ev.length && ev[ev.length - 1].startsWith('digDone')) { dug++; ev.push('-'); }
+    if (p.mod === 'air' || p.mod === 'launching') break;
+  }
+  log.push(`Bohren: ${dug} Tiles in ${frames} Frames (erstes Tile darunter: ${below}); ` + state());
+  ok(dug >= 1 || p.mod !== 'ground', 'Mindestens ein Tile gebohrt oder in Hohlraum gefallen');
+  ok(game.depth < 0, 'Tiefe negativ nach dem Bohren (' + game.depth + ' ft)');
+
+  // Fliegen nach oben
+  run(30);
+  const y0 = p.y;
+  run(40, { up: true });
+  log.push('nach 40 Frames hoch: ' + state());
+  ok(p.y < y0 || p.mod === 'launching' || p.mod === 'air', 'Pod steigt beim Fliegen');
+
+  // Verbrauch: Tank über längere Zeit leer fahren
+  run(600);
+  log.push('nach 600 Frames Leerlauf: ' + state());
+  ok(p.fuel < 6, 'Treibstoff wird verbraucht');
+
+  // Shop-Aktionen
+  game.cash = 1000;
+  p.fuel = 2; p.hp = 5;
+  log.push('Tanken: ' + game.buyFuel(-1).msg + ' / Reparatur: ' + game.repair(-1).msg);
+  ok(p.fuel === game.fuelCap && p.hp === game.maxHp, 'Tank voll und Hülle repariert');
+  game.bay[0] = 3; game.bay[3] = 1;
+  log.push('Verkauf: ' + game.sellAll().msg);
+  log.push('Upgrade: ' + game.buyUpgrade('drill', 1).msg + ', Cash ' + game.cash);
+  ok(game.up.drill === 1, 'Bohrer-Upgrade installiert');
+
+  // Regressionstest: seitlich bohren, dahinter eine Wand -> Pod darf nicht in die Wand rutschen
+  const inWall = (m = 19) => {
+    const pts = [[-m, -m], [m, -m], [-m, m], [m, m], [0, -m], [0, m], [-m, 0], [m, 0]];
+    return pts.some(([dx, dy]) => game.world.solidTile(Math.floor((p.x + dx) / 50 + 0.5), Math.floor((p.y + dy) / 50 + 0.5)));
+  };
+  for (const dir of ['left', 'right']) {
+    reset();
+    const W = game.world, s = dir === 'left' ? -1 : 1;
+    for (let x = 0; x < 36; x++) for (let y = 6; y < 12; y++) W.set(x, y, 1);
+    W.set(18, 8, 0);            // Pod steht hier auf Reihe 9
+    W.set(18 + s, 8, 1);        // wird angebohrt
+    W.set(18 + 2 * s, 8, 1);    // Wand dahinter
+    p.x = 18 * 50; p.y = 9 * 50 - 25 - 20.5; p.mod = 'ground'; p.tread = true;
+    p.facing = dir; p.fuel = 1e6; p.hp = 1e6;
+    let n = 0;
+    while (n++ < 400 && !(game.dugTile === 1 && !p.dig && p.mod === 'ground' && n > 20)) run(1, { [dir]: true });
+    run(30);
+    log.push(`Seitwärts ${dir}: ` + state() + ' Tile gebohrt: ' + (W.get(18 + s, 8) === 0));
+    ok(W.get(18 + s, 8) === 0 && !inWall(), `Seitwärts nach ${dir} bohren: Pod steckt nicht in der Wand`);
+  }
+
+  // Fuzzing: zufällige Eingaben, Pod darf außerhalb des Bohrens nie in massivem Tile stecken
+  reset();
+  p.fuel = 1e9; p.hp = 1e9;
+  let bad = 0, firstBad = '', digs = 0, maxPen = 0;
+  const combos = [{}, { left: true }, { right: true }, { up: true }, { down: true }, { down: true, left: true },
+    { down: true, right: true }, { up: true, left: true }, { up: true, right: true }];
+  for (let i = 0; i < 60000; i++) {
+    if (i % 25 === 0) Object.assign(input, { left: false, right: false, up: false, down: false },
+      combos[Math.floor(Math.random() * (p.y < 300 ? 9 : 7)) ]);
+    if (game.paused) game.leaveShop();
+    if (game.dead) { reset(); p.fuel = 1e9; p.hp = 1e9; }
+    const wasDig = !!p.dig;
+    game.step();
+    if (wasDig && !p.dig) digs++;
+    if (!p.dig && p.mod !== 'digging' && inWall()) {
+      bad++;
+      if (!firstBad) firstBad = state();
+      let depth = 1;
+      while (depth < 20 && inWall(19 - depth)) depth++;
+      maxPen = Math.max(maxPen, depth);
+    }
+  }
+  log.push(`Fuzzing: 60000 Frames, ${digs} Bohrungen, max. Tiefe ${game.maxDepth} ft, ${bad} Frames in der Wand (max. ${maxPen} px tief) ${firstBad}`);
+  ok(maxPen <= 3, 'Fuzzing: Pod steckt nie im Erdreich (Eck-Streifen bis 3 px wie im Original erlaubt)');
+
+  // ---------- Startsequenz (Mothership) ----------
+  reset();
+  Object.assign(input, { left: false, right: false, up: false, down: false }); // Tasten aus dem Zufallstest lösen
+  game.startDrop();
+  const dy = p.y, dx = p.x, dt0 = game.dayTime;
+  ok(dy > 100 && game.dropAnim, `Startsequenz: 10 Vorab-Bewegungen (y 100 -> ${dy.toFixed(2)}), dann Pause`);
+  ok(!game.useItem(0), 'während der Startsequenz keine Items');
+  run(52, { right: true, up: true });
+  ok(game.dropAnim && p.y === dy && p.x === dx && game.dayTime === dt0, '52 Frames: Pod, Eingaben und Tageszeit stehen');
+  run(1);
+  ok(!game.dropAnim && ev.includes('dropped '), 'Frame 53: Pod ausgeklinkt, Spiel läuft');
+  run(150);
+  ok(p.mod === 'ground' && Math.abs(p.y - 205) < 1.5, 'Pod landet nach dem Abwurf an der Oberfläche');
+
+  // ---------- Startdialog (erster Funkspruch) ----------
+  reset();
+  run(200);
+  ok(game.transmission === null, 'ohne Tageszeit (dayTime <= 40) noch kein Funkspruch');
+  game.dayTime = 41;
+  run(4);
+  ok(game.transmission === 0 && game.paused && ev.includes('transmission 0'), 'dayTime > 40: Startdialog öffnet sich, Spiel steht');
+  const tdt = game.dayTime;
+  game.tickTime();
+  ok(game.dayTime === tdt, 'während des Funkspruchs steht die Tageszeit');
+  game.closeTransmission();
+  run(40);
+  ok(!game.paused && game.transmission === null && game.lastTransmission === 0, 'nach dem Schließen geht es weiter, kein zweites Mal');
+
+  // ---------- Storyline-Checkpunkte: jeder Funkspruch wird regulär ausgelöst ----------
+  const badCp = [];
+  for (let n = 1; n <= 12; n++) {
+    reset();
+    checkpoint(game, n);
+    const cash0 = game.cash;
+    let f = 0;
+    while (game.transmission === null && f++ < 40) run(1);
+    if (game.transmission !== n || game.cash - cash0 !== TRANSMISSIONS[n].bonus) badCp.push(`${n}: ${game.transmission} (+$${game.cash - cash0})`);
+    game.closeTransmission();
+    run(12);
+    if (game.transmission !== null) badCp.push(`${n}: danach erneut ${game.transmission}`);
+  }
+  ok(badCp.length === 0, 'Checkpunkte 1–12 lösen genau ihren Funkspruch samt Bonus aus ' + badCp.join(' '));
+  reset();
+  checkpoint(game, 12);
+  run(8);
+  game.closeTransmission();
+  p.y = (game.world.height - 30) * 50; // zurück nach oben
+  run(8);
+  ok(!game.inCore, 'Rückkehr über Reihe earthHeight-17 beendet den Kernbereich');
+
+  // ---------- Endkampf ----------
+  reset();
+  checkpoint(game, 12);
+  p.hp = 1e9;
+  run(12);
+  ok(game.transmission === 12 && !game.battle, 'Kern: erst der Funkspruch, noch kein Kampf');
+  game.closeTransmission();
+  const B = () => game.battle;
+  ok(B() && B().phase === 1 && B().hp === 1000, 'Nach dem Funkspruch: Phase 1 mit 1000 HP (Level 1)');
+  const bx = B().x;
+  run(5);
+  ok(Math.abs(B().x - bx) === 20, `Mr. Husk läuft 4 px pro Frame (${bx} -> ${B().x})`);
+  game.items.fill(3);
+  run(30);
+  p.x = B().cx; p.xVel = 0;
+  const hp0 = B().hp;
+  game.itemTimer = 99;
+  game.useItem(2);
+  ok(B().hp === hp0 - 120, `Dynamit direkt am Boss: 120 Schaden (${hp0} -> ${B().hp})`);
+  run(40);
+  const hp1 = B().hp;
+  p.x = B().cx + 180; p.y = B().floorY - 20.5; p.xVel = 0; p.yVel = 0; p.mod = 'ground';
+  game.itemTimer = 99;
+  game.useItem(3);
+  ok(B().hp === hp1 - 60, `C4 im äußeren Bereich: 60 Schaden (${hp1} -> ${B().hp})`);
+  run(60);
+  // Berührung kostet den Pod Energie
+  p.x = B().cx; p.y = B().floorY - 20.5;
+  const podHp = p.hp;
+  run(3);
+  ok(p.hp < podHp, `Berührung mit Mr. Husk schadet dem Pod (${podHp - p.hp} HP)`);
+  // Phase 1 besiegen -> Pause -> Satan bricht aus -> Funkspruch 13 -> Phase 2
+  B().damage(1e6);
+  ok(B().state === 'die', 'Phase 1 besiegt: Todesanimation');
+  let bf = 0;
+  while (game.transmission === null && bf++ < 800) run(1);
+  ok(game.transmission === 13 && B().phase === 2, `Nach ${bf} Frames: Satan ausgebrochen, Funkspruch 13`);
+  game.closeTransmission();
+  ok(B().active && B().hp === 2000, 'Phase 2 läuft mit 2000 HP');
+  // Phase 2 besiegen -> Sieg, Beute Stück für Stück
+  const cash0 = game.cash;
+  B().damage(1e6);
+  bf = 0;
+  while (!game.victory && bf++ < 500) run(1);
+  ok(game.victory && game.lvl === 2 && game.up.drill === 0 && game.items.every((n) => n === 0),
+    `Sieg nach ${bf} Frames: Level 2, Upgrades und Items zurückgesetzt`);
+  run(61 * 10 + 5);
+  const loot = MINERALS.slice(14, 24).reduce((a, m) => a + m.value, 0);
+  ok(game.victory.done && game.cash - cash0 === loot, `Beute ausgezahlt: $${(game.cash - cash0).toLocaleString('en-US')}`);
+  game.startNewRound();
+  ok(game.lvl === 2 && game.cash === cash0 + loot && !game.victory && game.lastTransmission === -1, 'Neue Runde: Level und Geld bleiben');
+  // Kern verlassen beendet den Kampf
+  reset();
+  checkpoint(game, 12);
+  run(12);
+  game.closeTransmission();
+  p.y = (game.world.height - 30) * 50;
+  run(8);
+  ok(!game.battle, 'Wer den Kern verlässt, beendet den Kampf');
+
+  // ---------- Items ----------
+  const stand = (tx, ty) => { // Pod steht in Spalte tx auf Reihe ty+1
+    Object.assign(p, { x: tx * 50, y: ty * 50 + 4.5, xVel: 0, yVel: 0, mod: 'ground', tread: true, facing: 'right', anim: null });
+    run(10);
+  };
+  reset();
+  game.cash = 100000;
+  ok(game.buyItem(0).ok && game.items[0] === 1 && game.cash === 98000, 'Reservetank für $2000 gekauft');
+  game.cash = 100;
+  ok(!game.buyItem(5).ok && game.items[5] === 0, 'Materietransmitter ohne Geld nicht kaufbar');
+  game.items.fill(2);
+  run(200);
+  p.fuel = 3; game.itemTimer = 0;
+  ok(!game.useItem(0) && p.fuel === 3, 'Abklingzeit: direkt nach Spielstart noch kein Item (itemTimer <= 5)');
+  run(24);
+  ok(game.useItem(0) && Math.abs(p.fuel - game.fuelCap) < 1e-9 && game.items[0] === 1, 'Reservetank: +25 L, gedeckelt auf Tankgröße');
+  ok(!game.useItem(0), 'Zweiter Tank sofort danach blockiert');
+  run(24);
+  p.hp = 2;
+  ok(game.useItem(1) && p.hp === game.maxHp, 'Nanobots: +30 HP, gedeckelt auf Hülle');
+  // Dynamit: 3x3 um den Pod, Pflaster/Gebäude bleiben, Spiel steht 31 Frames
+  const W2 = game.world;
+  for (let x = 12; x <= 20; x++) for (let y = 6; y <= 14; y++) W2.set(x, y, 1);
+  W2.set(16, 9, 0); W2.set(17, 10, 26); W2.set(15, 10, 14); W2.set(16, 8, -4);
+  stand(16, 9);
+  run(24);
+  const fx = p.x, fy = p.y, t0 = game.dayTime;
+  ok(game.useItem(2) && game.itemAnim, 'Dynamit gezündet');
+  run(30);
+  ok(game.itemAnim && p.x === fx && p.y === fy && game.dayTime === t0, 'Während der Explosion steht das Spiel (30 Frames)');
+  ok(W2.get(16, 10) === 1, 'Tiles erst am Ende der Explosion entfernt');
+  run(1);
+  ok(!game.itemAnim, 'Nach 31 Frames geht es weiter');
+  const cleared3 = [];
+  for (let x = 14; x <= 18; x++) for (let y = 7; y <= 11; y++) if (W2.get(x, y) === 0) cleared3.push(x + ',' + y);
+  log.push('Dynamit: frei ' + cleared3.join(' '));
+  ok(W2.get(17, 10) === 0 && W2.get(15, 10) === 0 && W2.get(16, 10) === 0 && W2.get(15, 8) === 0, 'Dynamit: Fels und Mineral im 3x3-Feld weg');
+  ok(W2.get(16, 8) === -4, 'Pflaster bleibt stehen');
+  ok(W2.get(18, 10) === 1 && W2.get(16, 11) === 1 && W2.get(14, 9) === 1, 'Außerhalb von 3x3 bleibt alles');
+  run(60);
+  // C4 im festen Block: 5x5
+  for (let x = 12; x <= 22; x++) for (let y = 6; y <= 16; y++) W2.set(x, y, 2);
+  W2.set(17, 11, 0);
+  stand(17, 11);
+  run(24);
+  ok(game.useItem(3), 'C4 gezündet');
+  run(46);
+  ok(game.itemAnim && W2.get(17, 12) === 2, 'C4: 46 Frames Pause, Tiles noch da');
+  run(1);
+  let c = 0;
+  for (let x = 15; x <= 19; x++) for (let y = 9; y <= 13; y++) c += W2.get(x, y) === 0;
+  ok(!game.itemAnim && c === 25 && W2.get(20, 11) === 2 && W2.get(17, 14) === 2, 'C4: genau 5x5 freigesprengt (' + c + ')');
+  // in der Luft keine Sprengung
+  run(24);
+  p.mod = 'air';
+  ok(!game.useItem(2) && game.items[2] === 1, 'In der Luft kein Dynamit (Item bleibt)');
+  // Materietransmitter
+  reset(); game.items.fill(1); run(200);
+  for (let x = 0; x < 36; x++) for (let y = 6; y < 60; y++) game.world.set(x, y, 1);
+  game.world.set(20, 40, 0);
+  stand(20, 40);
+  run(30);
+  ok(game.useItem(5) && p.hidden, 'Materietransmitter: Pod verschwindet');
+  run(47);
+  ok(p.y > 1900, 'vor Frame 48 noch in der Tiefe');
+  run(1);
+  ok(p.x === 250 && p.y === 200 && p.xVel === 0 && p.yVel === 0, 'Frame 48: Pod bei (250, 200) über der Oberfläche');
+  run(56);
+  ok(game.itemAnim && p.hidden, 'Frame 104: noch unsichtbar');
+  run(1);
+  ok(!game.itemAnim && !p.hidden, 'Frame 105: zurück im Spiel');
+  run(150);
+  log.push('nach Transmitter: ' + state());
+  ok(p.mod === 'ground' && Math.abs(p.y - 205) < 1.5, 'Pod landet an der Oberfläche');
+  // Quantenteleporter: Zufall in y 1..100, Geschwindigkeit wie im Original
+  let okQ = true;
+  for (let k = 0; k < 40; k++) {
+    reset(); game.items.fill(1); run(200); run(24);
+    game.useItem(4); run(43);
+    if (!(p.x === 250 && p.y >= 1 && p.y <= 100 && p.xVel >= -20 && p.xVel <= 19 && p.yVel >= -30 && p.yVel <= 69)) okQ = false;
+    run(46);
+    if (game.itemAnim || p.hidden) okQ = false;
+  }
+  ok(okQ, 'Quantenteleporter: Ziel x=250, y in 1..100, Schleuder-Geschwindigkeit, 89 Frames');
+
+  // Save-Pod: schwebt bei x=850..923, y=-50..48 (wippt), Anflug öffnet den Speicherdialog
+  reset(); run(200);
+  ok(game.savePodFrame >= 0, 'Save-Pod an der Oberfläche sichtbar');
+  const flyTo = (x, y, n) => { ev.length = 0; p.x = x; p.y = y; p.mod = 'air'; p.xVel = 0; p.yVel = 0; run(n, { up: true }); };
+  flyTo(840, 0, 8);
+  ok(!game.paused && !ev.some((e) => e.startsWith('enterSave')), 'links neben dem Save-Pod: kein Dialog');
+  flyTo(886, 0, 8);
+  ok(game.paused && game.saving && ev.some((e) => e.startsWith('enterSave')), 'Save-Pod angeflogen: Speicherdialog');
+  ok(p.x >= 886 + 55 && p.xVel === 0 && p.yVel === 0, 'Pod 55 px nach rechts gesetzt und angehalten (x=' + p.x.toFixed(1) + ')');
+  run(10);
+  ok(game.paused, 'Spiel steht, solange der Dialog offen ist');
+  game.leaveSave();
+  ok(!game.paused && !game.saving && game.buildingTimer === 0, 'Dialog geschlossen: weiter');
+  // Speichern: 32 Werte wie im Original, Score wird zurückgesetzt
+  Object.assign(game, { cash: 123456, score: 98765, lvl: 2, lastTransmission: 7, playTime: 5000, totalPlayTime: 9000 });
+  Object.assign(game.up, { drill: 3, hull: 2, engine: 4, fuelTank: 1, radiator: 5, bay: 5 });
+  game.bay.fill(0); game.bay[0] = 4; game.bay[9] = 1;
+  game.items.fill(0); game.items[2] = 3; game.items[5] = 2;
+  p.hp = 57.8; p.fuel = 0.4;
+  let saved = null;
+  game.save((d) => { saved = d; return { prior: false }; });
+  ok(saved.length === 32 && saved[0] === 0 && saved[2] === 0 && game.score === 0, 'Gespeichert: 32 Werte, Score auf 0');
+  ok(saved[1] === 123456 && saved[3] === 2 && saved[5] === 1 && saved[6] === 2 && saved[7] === 3 && saved[11] === 5 &&
+    saved[12] === 4 && saved[21] === 1 && saved[24] === 3 && saved[27] === 2 && saved[28] === 0 && saved[29] === 7 &&
+    saved[30] === 5000 && saved[31] === 9000, 'Werte an den Plätzen des Originals (Tank mindestens 1)');
+  game.score = 50;
+  let threw = false;
+  try { game.save(() => { throw new Error('voll'); }); } catch { threw = true; }
+  ok(threw && game.score === 50, 'Speichern fehlgeschlagen: Score bleibt');
+  // Laden: neue Welt, dann die Werte (mit int())
+  reset();
+  game.applySave(JSON.parse(JSON.stringify(saved)));
+  ok(game.cash === 123456 && game.lvl === 2 && game.mineralValueMod === 2 && p.hp === 57 && p.fuel === 1 &&
+    game.up.drill === 3 && game.up.bay === 5 && game.bay[0] === 4 && game.items[2] === 3 && game.items[5] === 2 &&
+    game.lastTransmission === 7 && game.playTime === 5000 && game.score === 0, 'Laden stellt den Stand wieder her');
+  // Sonderfund: Geld sofort (wie im Original), dazu Fundbericht, solange steht das Spiel (auch die Tageszeit)
+  reset(); run(200);
+  const findCash0 = game.cash, day0 = game.dayTime, frame0 = game.frame;
+  ev.length = 0;
+  game.addToBay(12);
+  ok(game.cash === findCash0 + 10000 && game.findReport === 12 && game.paused && ev.some((e) => e === 'specialFind 12'),
+    'Marsskelett: $10.000 gutgeschrieben, Fundbericht offen, Spiel steht');
+  run(20); game.tickTime();
+  ok(game.frame === frame0 && game.dayTime === day0, 'während des Fundberichts läuft nichts weiter');
+  game.closeFindReport();
+  run(1);
+  ok(game.findReport === null && !game.paused && game.frame === frame0 + 1, 'Fundbericht geschlossen: weiter');
+  // Erster Bohrversuch in Fels: Hinweis, Spiel steht; danach nicht noch einmal
+  reset();
+  scenes.boulders(game); p = game.pod;
+  run(10);
+  ev.length = 0;
+  let rf = 0;
+  while (game.notice === null && rf++ < 60) run(1, { left: true });
+  ok(game.notice === 'rock' && game.paused && ev.some((e) => e === 'notice rock'), `Erster Bohrversuch in Fels: Hinweis nach ${rf} Frames, Spiel steht`);
+  game.closeNotice();
+  ev.length = 0;
+  run(60, { left: true });
+  ok(game.notice === null && !game.paused && !ev.some((e) => e.startsWith('notice')), 'Weitere Bohrversuche in Fels: kein zweiter Hinweis');
+  game.cash = 0;
+  game.startNewRound();
+  p = game.pod; // neue Runde legt einen neuen Pod an
+  ok(game.rockHintShown, 'Neue Runde: Hinweis bleibt bekannt');
+  // Erdbeben: jede Reihe ab 11 bis earthHeight-16 verrutscht um genau ein Tile (mit Umbruch), der Rest bleibt
+  reset(); run(200);
+  const WQ = game.world, HQ = WQ.height;
+  const rowOf = (y) => Array.from({ length: WQ.width }, (_, x) => WQ.get(x, y) + ':' + WQ.rotation(x, y));
+  const before = Array.from({ length: HQ }, (_, y) => rowOf(y));
+  game.earthQuake(4);
+  let shifted = 0, wrong = [];
+  for (let y = 0; y < HQ; y++) {
+    const a = before[y], b = rowOf(y);
+    const same = a.every((v, x) => v === b[x]);
+    const left = a.every((v, x) => b[x] === a[(x + 1) % a.length]);
+    const right = a.every((v, x) => b[x] === a[(x - 1 + a.length) % a.length]);
+    const inBand = y >= 11 && y < HQ - 15;
+    if (inBand && (left || right)) shifted++;
+    else if (inBand || !same) wrong.push(y);
+  }
+  ok(wrong.length === 0 && shifted === HQ - 15 - 11, `Erdbeben: ${shifted} Reihen um ein Tile verschoben, Oberfläche und Kern unverändert${wrong.length ? ' (falsch: ' + wrong.slice(0, 5) + ')' : ''}`);
+  const qFrame0 = game.frame;
+  let qf = 0;
+  const offsets = [];
+  while (game.quakeAnim && qf < 400) { run(1); qf++; offsets.push(game.quakeOffset); }
+  ok(qf === 160 && game.frame === qFrame0 && Math.max(...offsets) === 10, `Bebenanimation: ${qf} Frames (wie quakeFX), Spiel steht, Ausschlag bis ${Math.max(...offsets)} px`);
+  // Auslöser: nur beim Verlassen eines Shops, erst über 150.000 Punkte, Chance 1:20
+  let quakes = 0;
+  const countQuake = () => { game.leaveShop(); if (game.quakeAnim) { quakes++; game.quakeAnim = null; } };
+  game.score = 150000;
+  for (let i = 0; i < 400; i++) countQuake();
+  ok(quakes === 0, 'Bis 150.000 Punkte kein Erdbeben');
+  game.score = 150001;
+  for (let i = 0; i < 2000; i++) countQuake();
+  ok(quakes > 60 && quakes < 150, `Über 150.000 Punkten etwa jedes 20. Verlassen eines Shops (${quakes} von 2000)`);
+  // unter Tage gibt es keinen Save-Pod
+  p.x = 886; p.y = 2000; run(4);
+  ok(game.savePodFrame === -1 && !game.savePodHit(), 'unter Tage kein Save-Pod');
+
+  log.push('Ereignisse (letzte 15): ' + ev.filter((e) => e !== '-').slice(-15).join(' | '));
+} catch (e) {
+  log.push('EXCEPTION ' + e.stack);
+}
+document.getElementById('out').textContent = log.join('\n');
+</script>
+</body>
+</html>

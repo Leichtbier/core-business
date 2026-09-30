@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Sonderfunde</title>
+  <style>html, body { margin: 0; background: #1a1210; overflow: hidden; } canvas { display: block; }</style>
+  <script type="importmap">
+    { "imports": { "three": "../lib/three.module.min.js", "three/addons/": "../lib/addons/" } }
+  </script>
+</head>
+<body>
+<script type="module">
+// Vorschau der Sonderfunde (src/minerals.js) von vorne und schräg oben, gut ausgeleuchtet.
+// ?angle=0.6 dreht alle Modelle um die Hochachse
+import * as THREE from 'three';
+import { MINERAL_LOOK, mineralGeometry } from '../src/minerals.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xfff0e0, 0x302018, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(-3, 5, 6);
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 1.2, 13);
+camera.lookAt(0, 0, 0);
+const angle = +new URLSearchParams(location.search).get('angle') || 0;
+const finds = MINERAL_LOOK.map((l, i) => ({ l, i })).filter(({ l }) => l.parts);
+finds.forEach(({ l }, k) => {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: l.metal * 0.6, roughness: l.rough, flatShading: true });
+  for (const [row, tilt] of [[1.6, 0.25], [-1.8, 0.9]]) {
+    const m = new THREE.Mesh(mineralGeometry(l.shape), mat);
+    m.position.set((k - (finds.length - 1) / 2) * 3.2, row, 0);
+    m.rotation.set(tilt, angle, 0);
+    scene.add(m);
+  }
+});
+renderer.render(scene, camera);
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><title>Tunnelrand-Test</title>
+  <script type="importmap">{ "imports": { "three": "../lib/three.module.min.js", "three/addons/": "../lib/addons/" } }</script>
+</head>
+<body>
+<pre id="out">läuft…</pre>
+<script type="module">
+// Prüft alle 256 Nachbarschaften: Die Vorderfläche des Tunnelrands muss die erwartete Fläche haben
+// (Summe der festen Rasterzellen abzüglich der Eckrundungen) und darf keine Lücken/Überlappungen haben.
+import * as THREE from 'three';
+import { rimPattern, rimGeometry, RIM } from '../src/tiles.js';
+
+const log = [];
+let fails = 0;
+const seen = new Map();
+for (let n = 0; n < 256; n++) {
+  const key = rimPattern(n);
+  if (seen.has(key)) continue;
+  seen.set(key, n);
+  let expected = 0;
+  const w = [RIM, 1 - 2 * RIM, RIM];
+  for (let i = 0; i < 9; i++) if ((key >> i) & 1) expected += w[i % 3] * w[Math.floor(i / 3)];
+  const geo = rimGeometry(key);
+  if (!geo) { if (expected > 0) { fails++; log.push(`FAIL key ${key}: keine Geometrie`); } continue; }
+  // Fläche der Vorderseite (Dreiecke mit Normalen nach +z bei z = 0.5)
+  const pos = geo.attributes.position, idx = geo.index;
+  const tri = (i) => idx ? idx.getX(i) : i;
+  let area = 0;
+  const count = idx ? idx.count : pos.count;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let i = 0; i < count; i += 3) {
+    a.fromBufferAttribute(pos, tri(i)); b.fromBufferAttribute(pos, tri(i + 1)); c.fromBufferAttribute(pos, tri(i + 2));
+    if (Math.abs(a.z - 0.5) > 1e-4 || Math.abs(b.z - 0.5) > 1e-4 || Math.abs(c.z - 0.5) > 1e-4) continue;
+    area += ((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) / 2;
+  }
+  // Rundungen nehmen höchstens (1 - pi/4) * r^2 pro Ecke weg bzw. fügen es hinzu
+  const tol = 8 * 0.09 * 0.09 * (1 - Math.PI / 4) + 1e-3;
+  const ok = Math.abs(area - expected) <= tol;
+  if (!ok) fails++;
+  if (!ok) log.push(`FAIL key ${key} (n=${n}): Fläche ${area.toFixed(4)} erwartet ${expected.toFixed(4)}`);
+}
+log.unshift(`${seen.size} verschiedene Randmuster geprüft, ${fails} Fehler`);
+document.getElementById('out').textContent = log.join('\n');
+</script>
+</body>
+</html>
