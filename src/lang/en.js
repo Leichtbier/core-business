@@ -66,7 +66,7 @@ export default {
 
   // Funksprüche, Fundberichte, Hinweise
   transHead: 'INCOMING TRANSMISSION',
-  transEnd: '*** End of transmission *** · press any key to continue',
+  transEnd: '*** End of transmission *** · ↑↓ scroll · any other key to continue',
   continue: 'CONTINUE',
   roleCeo: 'CEO · Husk Heavy Industries',
   roleMiner: 'Mining pilot',

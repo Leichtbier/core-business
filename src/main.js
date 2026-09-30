@@ -31,6 +31,7 @@ window.addEventListener('keydown', (e) => {
   if (running) sfx.init(); // falls der Browser den Ton bis zur ersten Taste blockiert hat
   // Funkspruch offen: jede Taste gilt dem Dialog (wie im Original), nicht dem Spiel
   if (ui.transmissionOpen) {
+    if (ui.transmissionScroll(e.code)) { e.preventDefault(); return; }
     if (!e.repeat && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) ui.transmissionKey();
     if (KEYMAP[e.code] || e.code === 'Space') e.preventDefault();
     return;

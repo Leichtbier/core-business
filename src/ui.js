@@ -100,6 +100,7 @@ export class UI {
     $('transSender').textContent = sender;
     $('transRole').textContent = role;
     $('transMsg').textContent = '';
+    $('transMsg').scrollTop = 0;
     $('transMsg').classList.add('typing');
     $('transOk').disabled = true;
     $('transmission').classList.remove('hidden');
@@ -109,7 +110,11 @@ export class UI {
       if (!tr) return;
       if (!tr.done) {
         tr.shown = Math.min(tr.text.length, tr.shown + 2);
-        $('transMsg').textContent = tr.text.slice(0, tr.shown);
+        const msg = $('transMsg');
+        // mitlaufen, solange der Leser unten ist; wer zurückgescrollt hat, wird nicht weggerissen
+        const follow = msg.scrollTop + msg.clientHeight >= msg.scrollHeight - 24;
+        msg.textContent = tr.text.slice(0, tr.shown);
+        if (follow) msg.scrollTop = msg.scrollHeight;
         if (tr.shown >= tr.text.length) this.finishTransmissionText();
       }
       this.portrait.talking = !tr.done;
@@ -128,6 +133,17 @@ export class UI {
   }
 
   get transmissionOpen() { return !!this.trans; }
+
+  // Pfeiltasten/WASD/Bild-Tasten scrollen einen langen Funkspruch; true, wenn die Taste dafür verbraucht wurde
+  transmissionScroll(code) {
+    const msg = $('transMsg');
+    if (!this.trans || msg.scrollHeight <= msg.clientHeight + 1) return false;
+    const line = 24, page = msg.clientHeight - line;
+    const d = { ArrowUp: -line, KeyW: -line, ArrowDown: line, KeyS: line, PageUp: -page, PageDown: page }[code];
+    if (d === undefined) return false;
+    msg.scrollBy({ top: d, behavior: 'smooth' });
+    return true;
+  }
 
   // Tastendruck während eines Funkspruchs: erst Text vervollständigen, dann schließen
   transmissionKey(close = false) {

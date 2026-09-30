@@ -274,7 +274,13 @@ label.opt input { accent-color: var(--accent); margin: 0 6px 0 0; vertical-align
 .transText { background: #060a0d; border: 1px solid #000; box-shadow: inset 0 0 18px #000, 0 0 0 1px #2e2924; padding: 12px 14px; border-radius: 2px; }
 .transSender b { color: var(--accent); font-size: 18px; letter-spacing: 1px; text-shadow: 0 0 8px var(--glow); }
 .transSender span { color: var(--muted); font-size: 13px; margin-left: 10px; }
-.transText p { white-space: pre-line; line-height: 1.55; margin: 10px 0 0; min-height: 210px; font-size: 15px; color: #d6eefa; }
+.transText p { white-space: pre-line; line-height: 1.55; margin: 10px 0 0; font-size: 15px; color: #d6eefa;
+  /* feste Höhe (so hoch wie das Porträt): lange Funksprüche scrollen (Mausrad, Pfeiltasten), das Fenster wächst nicht mit */
+  height: clamp(120px, calc(100vh - 330px), 210px); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px;
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 55%, #000) transparent; }
+.transText p::-webkit-scrollbar { width: 6px; }
+.transText p::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 55%, #000); border-radius: 3px; }
+.transText p::-webkit-scrollbar-track { background: transparent; }
 .transText p.typing::after { content: '\258C'; color: var(--accent); animation: blink 0.8s steps(2) infinite; }
 /* Fundbericht: gleiches Fenster in Gold, Bildschirm mit warmem Laborlicht */
 .panel.trans.find { --accent: #ffc44a; --stripe: #8a6a1e; }

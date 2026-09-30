@@ -64,7 +64,7 @@ export default {
 
   // Funksprüche, Fundberichte, Hinweise
   transHead: 'FUNKSPRUCH EMPFANGEN',
-  transEnd: '*** Übertragung beendet *** · weiter mit beliebiger Taste',
+  transEnd: '*** Übertragung beendet *** · ↑↓ blättern · weiter mit anderer Taste',
   continue: 'WEITER',
   roleCeo: 'CEO · Husk Heavy Industries',
   roleMiner: 'Bergbaupilot',
