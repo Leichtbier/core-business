@@ -56,6 +56,7 @@ The money also applies after "New Game".
 | `src/audio.js` | Sound (Web Audio): drilling noise from overlapping individual hits, music with crossfading; music and effects have separate volume buses (`setMusicVolume`/`setSfxVolume`, gain = slider²) and mute toggles. The speaker icon bottom right opens the sliders (`setupVolume` in `src/main.js`; Esc or a click elsewhere closes them), key N mutes the music, everything is persisted (`ml3d.volume`) |
 | `test/volume-test.html` | Volume: sliders open only on click, music and effects separate, mute toggles, key N, Esc/click outside, persisted after reload |
 | `assets/music/main_theme.mp3` | Main theme (loops; quieter in shops without their own track, off while paused) |
+| `assets/music/deep_theme.mp3` | Deep theme, replaces the main theme below 6000 ft (the former main theme) |
 | `assets/music/fuel_station.mp3` | Fuel station music (starts from the beginning on entering, crossfaded) |
 | `assets/music/mineral_processing.mp3` | Mineral processing music (same) |
 | `assets/music/upgrade_shop.mp3` | Upgrade shop music (same) |

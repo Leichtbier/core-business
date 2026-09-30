@@ -2,7 +2,7 @@ import { FPS, ITEMS, ITEM, TRANSMISSIONS } from './constants.js';
 import { Game } from './sim.js';
 import { Renderer, tileColorHex } from './render.js';
 import { UI } from './ui.js';
-import { SoundFX, MUSIC_LEVEL, hasShopTrack } from './audio.js';
+import { SoundFX, MUSIC_LEVEL, DEEP_MUSIC_FT, DEEP_MUSIC_HYST, hasShopTrack } from './audio.js';
 import { setupScenarioMenu } from './menu.js';
 import { Portrait3D } from './portrait3d.js';
 import { readSave } from './save.js';
@@ -26,6 +26,7 @@ let running = false;
 let startCash = null; // ?cash=N: Startgeld zum Testen
 let held = false; // Testhilfe: Spiel und Effekte angehalten (?stopAt)
 let userPaused = false;
+let deepMusic = false; // Tiefenthema aktiv (siehe DEEP_MUSIC_FT)
 
 window.addEventListener('keydown', (e) => {
   if (running) sfx.init(); // falls der Browser den Ton bis zur ersten Taste blockiert hat
@@ -348,11 +349,15 @@ function loop(now) {
   const m = game.pod.mod;
   sfx.updateEngine(running && !userPaused && !game.paused && !game.dead, game.engineLoad,
     m === 'air' || m === 'launching' || m === 'digdownlaunching');
-  // Musik: jeder Shop mit eigenem Stück (ohne eigenes Stück: leiseres Hauptthema), Pause stumm
+  // Musik: jeder Shop mit eigenem Stück (ohne eigenes Stück: leiseres Hauptthema), Pause stumm;
+  // unterhalb von DEEP_MUSIC_FT läuft das Tiefenthema statt des Hauptthemas
   const shopTrack = hasShopTrack(ui.shopId) ? ui.shopId : null;
-  if (!running || userPaused) sfx.setMusic(shopTrack || 'main', MUSIC_LEVEL.off);
+  if (-game.depth >= DEEP_MUSIC_FT) deepMusic = true;
+  else if (-game.depth < DEEP_MUSIC_FT - DEEP_MUSIC_HYST) deepMusic = false;
+  const theme = deepMusic ? 'deep' : 'main';
+  if (!running || userPaused) sfx.setMusic(shopTrack || theme, MUSIC_LEVEL.off);
   else if (shopTrack) sfx.setMusic(shopTrack, MUSIC_LEVEL.shopTrack);
-  else sfx.setMusic('main', game.paused ? MUSIC_LEVEL.shop : MUSIC_LEVEL.main);
+  else sfx.setMusic(theme, game.paused ? MUSIC_LEVEL.shop : MUSIC_LEVEL.main);
   renderer.render(game, alpha, held ? 0 : dt);
   // Mothership: Brummen folgt dem Flug, beim Ausklinken ein Schlag
   const ship = renderer.shipAudio || { hum: 0 };

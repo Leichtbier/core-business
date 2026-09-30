@@ -63,7 +63,7 @@ try {
 
   // Musik: Steuerung mit nachgebautem Audio-Element prüfen
   // (echte Medienelemente halten im Headless-Browser die virtuelle Zeit an)
-  for (const f of ['main_theme', 'fuel_station']) {
+  for (const f of ['main_theme', 'deep_theme', 'fuel_station']) {
     const head = await fetch(`../assets/music/${f}.mp3`, { method: 'HEAD' });
     ok(head.ok, `${f}.mp3 erreichbar (${head.headers.get('content-length')} Bytes)`);
   }
@@ -91,6 +91,13 @@ try {
   const n = main.gain.gain.events.length;
   mus.setMusic('main', MUSIC_LEVEL.main);
   ok(main.gain.gain.events.length === n, 'gleiche Einstellung erneut: keine neue Rampe');
+
+  const deep = mus.tracks.deep;
+  ok(deep?.el.src.endsWith('deep_theme.mp3') && deep.el.loop, 'Tiefenthema (früheres Hauptthema) vorhanden und in Schleife');
+  mus.setMusic('deep', MUSIC_LEVEL.main);
+  ok(!deep.el.paused && lastRamp(deep) === MUSIC_LEVEL.main && lastRamp(main) === 0, 'tief unten: Tiefenthema eingeblendet, Hauptthema ausgeblendet');
+  mus.setMusic('main', MUSIC_LEVEL.main);
+  ok(lastRamp(main) === MUSIC_LEVEL.main && lastRamp(deep) === 0, 'zurück nach oben: wieder das Hauptthema');
 
   fuel.el.currentTime = 30;
   mus.setMusic('fuel', MUSIC_LEVEL.shopTrack);

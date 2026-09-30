@@ -35,6 +35,7 @@ const ENGINE_AIR_BOOST = 1.15; // in der Luft läuft im Original zusätzlich der
 // Hauptthema leiser weiterspielen. Stücke werden gestreamt (komplett dekodiert wären es ~60 MB für das Hauptthema).
 const MUSIC_FILES = {
   main: new URL('../assets/music/main_theme.mp3', import.meta.url),
+  deep: new URL('../assets/music/deep_theme.mp3', import.meta.url), // früheres Hauptthema, erst tief unten (DEEP_MUSIC_FT)
   fuel: new URL('../assets/music/fuel_station.mp3', import.meta.url),
   sell: new URL('../assets/music/mineral_processing.mp3', import.meta.url),
   upgrade: new URL('../assets/music/upgrade_shop.mp3', import.meta.url),
@@ -42,6 +43,9 @@ const MUSIC_FILES = {
 };
 const RESTART_ON_ENTER = new Set(['fuel', 'sell', 'upgrade', 'repair']); // Shop-Musik beginnt wie im Original immer von vorne
 export const hasShopTrack = (shopId) => shopId !== 'main' && shopId in MUSIC_FILES;
+// Ab dieser Tiefe (ft) läuft statt des Hauptthemas das Tiefenthema; zurück erst DEEP_MUSIC_HYST ft höher,
+// damit es an der Grenze nicht hin und her blendet
+export const DEEP_MUSIC_FT = 6000, DEEP_MUSIC_HYST = 100;
 export const MUSIC_LEVEL = { main: 0.4, shop: 0.17, shopTrack: 0.32, off: 0 };
 const MUSIC_FADE = 0.6; // Sekunden für Überblendungen
 
