@@ -6,6 +6,8 @@ Only the presentation is new.
 
 **Play online:** [https://leichtbier.github.io/core-business/](https://leichtbier.github.io/core-business/) Dev mode: append `?dev`.
 
+![The pod at the surface between the upgrade shop and the repair shop at night, below the "Mars needs miners!" billboard](screenshots/shot1.png)
+
 > [!NOTE]
 > **Vibe-coded with Claude Opus 5.5.** The entire work – game code, tests, textures, texts and translations, and all
 > 3D models including the Blender scripts that generate them – was vibe-coded with Claude Opus 5.5 (Anthropic).
