@@ -4,6 +4,8 @@ A 2.5D remake of Motherload (XGen Studios) built with three.js. The game mechani
 ActionScript of the original SWF (physics at 42 fps, world generation, drilling, prices).
 Only the presentation is new.
 
+**Play online:** [https://leichtbier.github.io/core-business/](https://leichtbier.github.io/core-business/) Dev mode: append `?dev`.
+
 > [!NOTE]
 > **Vibe-coded with Claude Opus 5.5.** The entire work – game code, tests, textures, texts and translations, and all
 > 3D models including the Blender scripts that generate them – was vibe-coded with Claude Opus 5.5 (Anthropic).
@@ -20,8 +22,6 @@ Only the presentation is new.
 > ElevenLabs, and the game logic was re-implemented from the original's rules. The original SWF and its ActionScript are not part of this repository.
 >
 > Fan project, not affiliated with XGen Studios. "Motherload" is a trademark of XGen Studios.
-
-**Play online:** `https://leichtbier.github.io/core-business/` (GitHub Pages, see below). Dev mode: append `?dev`.
 
 The name: "core business" as in both the company's main line of work and the planet's core – Husk Heavy Industries
 lures the miners ever deeper with the promise of the big find, and the real business waits in the core. The storage keys
