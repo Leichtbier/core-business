@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Betonplatten</title>
+  <style>html, body { margin: 0; background: #1a1210; overflow: hidden; } canvas { display: block; }</style>
+  <script type="importmap">
+    { "imports": { "three": "../lib/three.module.min.js", "three/addons/": "../lib/addons/" } }
+  </script>
+</head>
+<body>
+<script type="module">
+// Vorschau der Betonplatten unter den Gebäuden (paveGeometry in src/tiles.js, paveTextures in src/textures.js):
+// oben alle Varianten als Mittelstück, darunter ein Abschnitt mit Endstücken wie in der Welt.
+// ?y=1.5 hebt die Kamera (Blick auf die Oberseite)
+import * as THREE from 'three';
+import { paveGeometry } from '../src/tiles.js';
+import { paveTextures, PAVE_VARIANTS } from '../src/textures.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc8703c);
+scene.add(new THREE.HemisphereLight(0xffe2c8, 0x40241a, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0dd, 2.4);
+sun.position.set(-4, 7, 6);
+sun.castShadow = true;
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100);
+const camY = +new URLSearchParams(location.search).get('y') || 0.9;
+camera.position.set(0, camY, 9.5);
+camera.lookAt(0, -0.2, 0);
+
+const tex = paveTextures();
+const mats = [
+  new THREE.MeshStandardMaterial({ map: tex.concrete, bumpMap: tex.concrete, bumpScale: 1.2, roughness: 0.9 }),
+  new THREE.MeshStandardMaterial({ map: tex.steel, bumpMap: tex.steel, bumpScale: 0.8, roughness: 0.55, metalness: 0.35 }),
+];
+const put = (v, end, x, y) => {
+  const m = new THREE.Mesh(paveGeometry(v, PAVE_VARIANTS, end), mats);
+  m.position.set(x, y, 0);
+  m.castShadow = m.receiveShadow = true;
+  scene.add(m);
+};
+for (let v = 0; v < PAVE_VARIANTS; v++) put(v, 0, (v - (PAVE_VARIANTS - 1) / 2) * 1.15, 0.8);
+const row = [2, 0, 3, 1, 2, 0];
+row.forEach((v, i) => put(v, i === 0 ? -1 : i === row.length - 1 ? 1 : 0, i - (row.length - 1) / 2, -1));
+renderer.render(scene, camera);
+</script>
+</body>
+</html>

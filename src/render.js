@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TILE, EARTH_WIDTH, EARTH_HEIGHT, BUILDINGS, T, DAY_LENGTH, SAVE_POD } from './constants.js';
 import {
-  dirtTexture, rockTexture, smokeTexture, billboardTexture, glowTexture, lavaTexture, concreteTexture, backWallTexture,
+  dirtTexture, rockTexture, smokeTexture, billboardTexture, glowTexture, lavaTexture, paveTextures, PAVE_VARIANTS, backWallTexture,
 } from './textures.js';
 import { ItemFX } from './items-fx.js';
 import { MINERAL_LOOK, mineralGeometry, gemEnvironment } from './minerals.js';
 import { Dropship } from './dropship.js';
 import { BossView } from './boss.js';
-import { tileGeometry, boulderGeometry, boulderFragments, BOULDER_VARIANTS, lavaPocketGeometry, rimGeometry, rimPattern, worldUV, RIM, UP, RIGHT, DOWN, LEFT } from './tiles.js';
+import { tileGeometry, paveGeometry, boulderGeometry, boulderFragments, BOULDER_VARIANTS, lavaPocketGeometry, rimGeometry, rimPattern, worldUV, RIM, UP, RIGHT, DOWN, LEFT } from './tiles.js';
 
 // Weltpixel (y nach unten) -> three.js-Einheiten (1 Tile = 1 Einheit, y nach oben)
 const U = 1 / TILE;
@@ -144,7 +144,7 @@ export class Renderer {
   }
 
   setupMaterials() {
-    const dirtTex = dirtTexture(), rockTex = rockTexture(), lavaTex = lavaTexture();
+    const dirtTex = dirtTexture(), rockTex = rockTexture(), lavaTex = lavaTexture(), paveTex = paveTextures();
     this.mats = {
       dirt: worldUV(new THREE.MeshStandardMaterial({ map: dirtTex, bumpMap: dirtTex, bumpScale: 1.5, roughness: 0.95 }), 0.5),
       rock: worldUV(new THREE.MeshStandardMaterial({ map: rockTex, bumpMap: rockTex, bumpScale: 4, roughness: 0.8, flatShading: true }), 0.8),
@@ -153,7 +153,11 @@ export class Renderer {
       lava: worldUV(new THREE.MeshStandardMaterial({
         map: lavaTex, emissiveMap: lavaTex, emissive: 0xff5500, emissiveIntensity: 0.9, roughness: 0.5,
       }), 0.5),
-      pave: new THREE.MeshStandardMaterial({ map: concreteTexture(), roughness: 0.8 }),
+      // Betonplatten unter den Gebäuden: Beton und Stahlkante (Gruppen von paveGeometry)
+      pave: [
+        new THREE.MeshStandardMaterial({ map: paveTex.concrete, bumpMap: paveTex.concrete, bumpScale: 1.2, roughness: 0.9 }),
+        new THREE.MeshStandardMaterial({ map: paveTex.steel, bumpMap: paveTex.steel, bumpScale: 0.8, roughness: 0.55, metalness: 0.35 }),
+      ],
       // verkohlte, glimmende Erde rund um Magmaeinschlüsse
       crust: worldUV(new THREE.MeshStandardMaterial({
         map: dirtTex, bumpMap: dirtTex, bumpScale: 2, color: 0x4a1a0c, emissive: 0x5a1400, roughness: 1,
@@ -195,7 +199,9 @@ export class Renderer {
       crust: [...Array(LAVA_SHAPES)].map((_, v) =>
         make(lavaPocketGeometry(v, { radius: 0.38, front: 0.506, dome: 0.012 }), this.mats.crust, 120, false)),
       rock: [...Array(BOULDER_VARIANTS)].map((_, v) => make(boulderGeometry(v), this.mats.rock, 250, true)),
-      pave: [make(new THREE.BoxGeometry(1, 1, 1), this.mats.pave, 48, false)],
+      // je Plattenvariante: linkes Endstück, Mittelstück, rechtes Endstück (Index end + 1 + 3 * Variante)
+      pave: [...Array(PAVE_VARIANTS * 3)].map((_, i) =>
+        make(paveGeometry(Math.floor(i / 3), PAVE_VARIANTS, (i % 3) - 1), this.mats.pave, 24, false)),
     };
     this.rims = new Map(); // Tunnelrand-Muster -> InstancedMesh
     // Weicher, additiver Lichtschein um Mineral-Tiles (Farbe je Mineral, pulsiert leicht)
@@ -693,7 +699,8 @@ export class Renderer {
         } else if (t === -1 || t === -2) {
           put('dirt', mask, x, y, sx, sy, ox, oy, depthColor(y, C), oz); // Oberflächen-Tile (im Original Gras)
         } else if (t <= -3 && t >= -5) {
-          put('pave', 0, x, y);
+          // -3 linkes Ende, -4 Mitte, -5 rechtes Ende; Varianten reihum (gemischt), damit Nachbarplatten nie gleich aussehen
+          put('pave', (-4 - t) + 1 + 3 * [2, 0, 3, 1][x % PAVE_VARIANTS], x, y);
         } else if (t === -6 || t === -7) {
           put('dirt', mask, x, y, 1, 1, 0, 0, C.setRGB(0.3, 0.2, 0.18));
         } else if (t === -8) {

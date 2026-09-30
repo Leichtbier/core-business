@@ -237,3 +237,31 @@ export function worldUV(material, scale = 0.5, { offsetY = 0, topV = -1 } = {}) 
   material.customProgramCacheKey = () => `worldUV${scale}/${offsetY}/${topV}`;
   return material;
 }
+
+// ---------- Betonplatten unter den Gebäuden ----------
+// Block mit Stahlkante (leicht erhabene Lippe) oben an der Vorderkante; die Endstücke eines Abschnitts
+// (end = -1 links, 1 rechts, 0 Mitte) bekommen zusätzlich einen senkrechten Kantenschutz.
+// Gruppe 0 = Beton (Atlas aus paveTextures: Spalte variant, oben Vorderseite, unten Oberseite), Gruppe 1 = Stahl.
+// Flächenreihenfolge der BoxGeometry: +x, -x, +y, -y, +z, -z mit je 4 Ecken.
+export function paveGeometry(variant, variants, end = 0) {
+  const remap = (geo, faceRect) => {
+    const uv = geo.attributes.uv;
+    for (let f = 0; f < 6; f++) {
+      const [u0, v0, u1, v1] = faceRect(f);
+      for (let k = f * 4; k < f * 4 + 4; k++) uv.setXY(k, u0 + uv.getX(k) * (u1 - u0), v0 + uv.getY(k) * (v1 - v0));
+    }
+    return geo;
+  };
+  const u0 = variant / variants, u1 = (variant + 1) / variants;
+  // Beton: oben die Oberseite (untere Atlashälfte), sonst die Vorderseite (obere Hälfte)
+  const body = remap(new THREE.BoxGeometry(1, 1, 1), (f) => (f === 2 ? [u0, 0, u1, 0.5] : [u0, 0.5, u1, 1]));
+  // Stahl: Vorderseite mit Warnstreifen (obere Texturhälfte), alle anderen Seiten blankes Blech
+  const steelUV = (f) => (f === 4 ? [0, 0.5, 1, 1] : [0, 0, 1, 0.5]);
+  const lip = remap(new THREE.BoxGeometry(1, 0.125, 0.095), steelUV).translate(0, 0.4525, 0.4875);
+  const steel = [lip];
+  if (end) {
+    const guard = remap(new THREE.BoxGeometry(0.07, 0.89, 0.04), (f) => (f === 4 ? [0, 0, 0.3, 0.5] : [0, 0, 1, 0.5]));
+    steel.push(guard.translate(end * 0.4675, -0.055, 0.515));
+  }
+  return mergeGeometries([body, mergeGeometries(steel)], true);
+}

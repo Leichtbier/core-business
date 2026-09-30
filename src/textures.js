@@ -190,15 +190,262 @@ export const lavaTexture = () => canvasTexture(128, (g, s, r) => {
   speckle(g, s, r, 40, ['#5a1200', '#3a0b00'], 3, 9);
 }, 13);
 
-export const concreteTexture = () => canvasTexture(128, (g, s, r) => {
-  g.fillStyle = '#8b8b8e';
-  g.fillRect(0, 0, s, s);
-  speckle(g, s, r, 250, ['#7c7c80', '#9a9a9e', '#707074'], 1, 3);
-  g.fillStyle = '#e0b020';
-  for (let x = 0; x < s; x += 32) g.fillRect(x, 6, 16, 6);
-  g.strokeStyle = 'rgba(40,40,45,0.6)';
-  g.strokeRect(1, 1, s - 2, s - 2);
-}, 19);
+// Betonplatten unter den Gebäuden: Atlas mit PAVE_VARIANTS Spalten, oben die Vorderseiten, unten die Oberseiten
+// (Fertigteile mit Fugen, Ankerlöchern, Rostfahnen, Rissen, Reifenspuren, Ölflecken, rotem Staub).
+// Dazu die Stahlkante: obere Hälfte Warnstreifen mit Bolzen, untere Hälfte blankes, verkratztes Blech.
+export const PAVE_VARIANTS = 4;
+export function paveTextures() {
+  const C = 256, N = PAVE_VARIANTS;
+  const c = document.createElement('canvas');
+  c.width = C * N;
+  c.height = C * 2;
+  const g = c.getContext('2d');
+  const r = rng(19);
+  const streak = (x, y, w, len, rgb, a) => {
+    const gr = g.createLinearGradient(0, y, 0, y + len);
+    gr.addColorStop(0, `rgba(${rgb}, ${a})`);
+    gr.addColorStop(1, `rgba(${rgb}, 0)`);
+    g.fillStyle = gr;
+    g.beginPath();
+    g.moveTo(x - w / 2, y);
+    g.lineTo(x + w / 2, y);
+    g.lineTo(x + w * 0.2, y + len);
+    g.lineTo(x - w * 0.2, y + len);
+    g.fill();
+  };
+  const crack = (x, y, dx, dy, steps, len) => {
+    const pts = [[x, y]];
+    for (let k = 0; k < steps; k++) {
+      x += dx * len + (r() - 0.5) * len * 0.9;
+      y += dy * len + (r() - 0.5) * len * 0.9;
+      pts.push([x, y]);
+    }
+    for (const [col, off] of [['rgba(230, 225, 215, 0.35)', 1], ['rgba(35, 30, 28, 0.8)', 0]]) {
+      g.strokeStyle = col;
+      g.lineWidth = off ? 1.2 : 1.4;
+      g.beginPath();
+      pts.forEach(([px, py], k) => (k ? g.lineTo(px + off, py + off) : g.moveTo(px + off, py + off)));
+      g.stroke();
+    }
+  };
+  const blotch = (x, y, rx, ry, rgb, a) => {
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+    gr.addColorStop(0, `rgba(${rgb}, ${a})`);
+    gr.addColorStop(0.6, `rgba(${rgb}, ${a * 0.6})`);
+    gr.addColorStop(1, `rgba(${rgb}, 0)`);
+    g.save();
+    g.translate(x, y);
+    g.scale(rx, ry);
+    g.fillStyle = gr;
+    g.beginPath();
+    g.arc(0, 0, 1, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  };
+  const aggregate = (x0, y0, n) => {
+    for (let i = 0; i < n; i++) {
+      const light = r() < 0.5;
+      g.fillStyle = light ? `rgba(215, 210, 200, ${0.15 + r() * 0.25})` : `rgba(50, 46, 42, ${0.12 + r() * 0.25})`;
+      g.beginPath();
+      g.ellipse(x0 + r() * C, y0 + r() * C, 0.6 + r() * 2.2, 0.5 + r() * 1.6, r() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+  };
+
+  for (let v = 0; v < N; v++) {
+    // ---------- Vorderseite ----------
+    const x0 = v * C;
+    g.save();
+    g.beginPath();
+    g.rect(x0, 0, C, C);
+    g.clip();
+    const base = g.createLinearGradient(0, 0, 0, C);
+    base.addColorStop(0, '#9b9892');
+    base.addColorStop(0.6, '#8d8983');
+    base.addColorStop(1, '#78716a');
+    g.fillStyle = base;
+    g.fillRect(x0, 0, C, C);
+    // Schalungsbild: leicht unterschiedlich getönte Bretterbahnen
+    for (let y = 0; y < C; y += 32) {
+      g.fillStyle = r() < 0.5 ? `rgba(255, 250, 240, ${r() * 0.06})` : `rgba(40, 35, 30, ${r() * 0.07})`;
+      g.fillRect(x0, y, C, 32);
+    }
+    aggregate(x0, 0, 900);
+    // Betonierfuge auf halber Höhe
+    const jy = Math.round(C * 0.56);
+    g.fillStyle = 'rgba(45, 40, 36, 0.55)';
+    g.fillRect(x0, jy, C, 2);
+    g.fillStyle = 'rgba(235, 230, 220, 0.3)';
+    g.fillRect(x0, jy + 2, C, 1);
+    // Ankerlöcher der Schalung, manche mit Rostfahne
+    for (const [ax, ay] of [[0.17, 0.3], [0.83, 0.3], [0.17, 0.8], [0.83, 0.8]]) {
+      const hx = x0 + ax * C + (r() - 0.5) * 4, hy = ay * C;
+      if (r() < 0.55) streak(hx, hy + 3, 5 + r() * 4, 25 + r() * 70, '120, 58, 22', 0.45 + r() * 0.2);
+      g.fillStyle = 'rgba(230, 225, 215, 0.45)';
+      g.beginPath(); g.arc(hx + 0.8, hy + 0.8, 5.5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#3a3531';
+      g.beginPath(); g.arc(hx, hy, 5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#1c1917';
+      g.beginPath(); g.arc(hx - 0.8, hy - 0.8, 2.6, 0, Math.PI * 2); g.fill();
+    }
+    // Wasserschlieren von der Stahlkante herab
+    for (let i = 0; i < 6; i++) streak(x0 + r() * C, 26, 6 + r() * 14, 40 + r() * 120, '55, 48, 42', 0.12 + r() * 0.12);
+    if (v === 1 || v === 3) crack(x0 + C * (0.3 + r() * 0.4), jy + 2, (r() - 0.5) * 0.6, 1, 8, 13);
+    if (v === 3) crack(x0 + C * 0.95, C * 0.35, -1, 0.35, 6, 12);
+    if (v === 2) {
+      // abgeplatzte Ecke unten rechts, darin rostige Bewehrung
+      g.fillStyle = '#6a635c';
+      g.beginPath();
+      g.moveTo(x0 + C, C * 0.72);
+      g.lineTo(x0 + C * 0.9, C * 0.75);
+      g.lineTo(x0 + C * 0.84, C * 0.86);
+      g.lineTo(x0 + C * 0.78, C);
+      g.lineTo(x0 + C, C);
+      g.fill();
+      g.strokeStyle = 'rgba(40, 36, 32, 0.8)';
+      g.lineWidth = 1.5;
+      g.stroke();
+      g.strokeStyle = '#7a3d18';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(x0 + C * 0.86, C * 0.9); g.lineTo(x0 + C, C * 0.9);
+      g.moveTo(x0 + C * 0.93, C * 0.77); g.lineTo(x0 + C * 0.93, C);
+      g.stroke();
+      streak(x0 + C * 0.9, C * 0.9, 6, 30, '120, 58, 22', 0.5);
+    }
+    if (v === 0) {
+      // aufgesprühte Fertigteilnummer, verblasst
+      g.font = 'bold 22px "Arial Narrow", Arial, sans-serif';
+      g.fillStyle = 'rgba(40, 36, 34, 0.5)';
+      g.fillText(`P-${String(3 + v * 7 + Math.floor(r() * 5)).padStart(2, '0')}`, x0 + C * 0.36, C * 0.44);
+      g.fillStyle = 'rgba(200, 150, 30, 0.45)';
+      g.fillRect(x0 + C * 0.36, C * 0.46, 46, 3);
+    }
+    // roter Marsstaub von unten, Spritzer vom Fahrwerk
+    const dust = g.createLinearGradient(0, C * 0.6, 0, C);
+    dust.addColorStop(0, 'rgba(140, 62, 32, 0)');
+    dust.addColorStop(1, 'rgba(140, 62, 32, 0.55)');
+    g.fillStyle = dust;
+    g.fillRect(x0, C * 0.6, C, C * 0.4);
+    for (let i = 0; i < 70; i++) {
+      g.fillStyle = `rgba(${120 + r() * 40}, ${50 + r() * 20}, 28, ${0.2 + r() * 0.35})`;
+      const y = C - Math.pow(r(), 2) * C * 0.45;
+      g.beginPath(); g.ellipse(x0 + r() * C, y, 1 + r() * 3, 0.8 + r() * 2, r() * 3, 0, Math.PI * 2); g.fill();
+    }
+    // Schatten unter der Stahlkante und Fertigteilfugen links und rechts
+    const occ = g.createLinearGradient(0, 22, 0, 46);
+    occ.addColorStop(0, 'rgba(20, 18, 16, 0.55)');
+    occ.addColorStop(1, 'rgba(20, 18, 16, 0)');
+    g.fillStyle = occ;
+    g.fillRect(x0, 22, C, 24);
+    for (const [sx, dir] of [[x0, 1], [x0 + C, -1]]) {
+      g.fillStyle = 'rgba(30, 27, 24, 0.85)';
+      g.fillRect(dir > 0 ? sx : sx - 3, 0, 3, C);
+      g.fillStyle = dir > 0 ? 'rgba(235, 230, 220, 0.35)' : 'rgba(30, 27, 24, 0.3)';
+      g.fillRect(dir > 0 ? sx + 3 : sx - 5, 0, 2, C);
+    }
+    g.restore();
+
+    // ---------- Oberseite (Leinwand oben = hinten, unten = Vorderkante) ----------
+    const y0 = C;
+    g.save();
+    g.beginPath();
+    g.rect(x0, y0, C, C);
+    g.clip();
+    g.fillStyle = '#97938c';
+    g.fillRect(x0, y0, C, C);
+    aggregate(x0, y0, 700);
+    // Besenstrich quer zur Fahrtrichtung
+    for (let i = 0; i < 90; i++) {
+      g.fillStyle = r() < 0.5 ? 'rgba(255, 250, 240, 0.06)' : 'rgba(40, 35, 30, 0.07)';
+      g.fillRect(x0 + r() * C, y0, 1 + r() * 2, C);
+    }
+    // Reifen- und Kufenspuren in Fahrtrichtung
+    for (let i = 0; i < 3; i++) {
+      const ty = y0 + C * (0.35 + r() * 0.5), th = 10 + r() * 16;
+      g.fillStyle = `rgba(30, 26, 22, ${0.08 + r() * 0.1})`;
+      g.beginPath();
+      g.moveTo(x0, ty);
+      g.bezierCurveTo(x0 + C * 0.3, ty + (r() - 0.5) * 12, x0 + C * 0.7, ty + (r() - 0.5) * 12, x0 + C, ty);
+      g.lineTo(x0 + C, ty + th);
+      g.bezierCurveTo(x0 + C * 0.7, ty + th, x0 + C * 0.3, ty + th, x0, ty + th);
+      g.fill();
+    }
+    if (v !== 1) blotch(x0 + C * (0.25 + r() * 0.5), y0 + C * (0.35 + r() * 0.4), 26 + r() * 22, 14 + r() * 12, '28, 24, 20', 0.4 + r() * 0.2);
+    if (v === 1) crack(x0 + C * 0.2, y0 + C * 0.1, 0.4, 1, 10, 16);
+    // Staubverwehungen, vor allem hinten
+    for (let i = 0; i < 5; i++) blotch(x0 + r() * C, y0 + r() * C * 0.6, 30 + r() * 50, 10 + r() * 22, '150, 70, 36', 0.18 + r() * 0.15);
+    // Dehnfugen an den Plattengrenzen
+    g.fillStyle = 'rgba(30, 27, 24, 0.8)';
+    g.fillRect(x0, y0, 3, C);
+    g.fillRect(x0 + C - 3, y0, 3, C);
+    g.restore();
+  }
+  // feines Korn über alles
+  const img = g.getImageData(0, 0, c.width, c.height), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (r() - 0.5) * 22;
+    d[i] += n; d[i + 1] += n; d[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+  const concrete = new THREE.CanvasTexture(c);
+  concrete.colorSpace = THREE.SRGBColorSpace;
+  concrete.anisotropy = 8;
+
+  // ---------- Stahlkante ----------
+  const s = document.createElement('canvas');
+  s.width = 256;
+  s.height = 128;
+  const h = s.getContext('2d');
+  h.fillStyle = '#e0ae1c';
+  h.fillRect(0, 0, 256, 64);
+  h.fillStyle = '#1b1a18';
+  for (let x = -64; x < 256 + 64; x += 64) {
+    h.beginPath();
+    h.moveTo(x, 64); h.lineTo(x + 32, 64); h.lineTo(x + 32 + 64, 0); h.lineTo(x + 64, 0);
+    h.fill();
+  }
+  // Abrieb: Farbe abgeplatzt, darunter blankes Metall und Rost
+  for (let i = 0; i < 160; i++) {
+    h.fillStyle = r() < 0.6 ? `rgba(70, 68, 66, ${0.4 + r() * 0.5})` : `rgba(125, 60, 22, ${0.3 + r() * 0.4})`;
+    h.beginPath(); h.ellipse(r() * 256, r() * 64, 0.8 + r() * 3.5, 0.6 + r() * 1.5, r() * 3, 0, Math.PI * 2); h.fill();
+  }
+  const dirt = h.createLinearGradient(0, 0, 0, 64);
+  dirt.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  dirt.addColorStop(1, 'rgba(110, 50, 25, 0.4)');
+  h.fillStyle = dirt;
+  h.fillRect(0, 0, 256, 64);
+  // Bolzen
+  for (const bx of [32, 128, 224]) {
+    h.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    h.beginPath(); h.arc(bx + 1.5, 33.5, 8, 0, Math.PI * 2); h.fill();
+    const bolt = h.createRadialGradient(bx - 2, 30, 1, bx, 32, 8);
+    bolt.addColorStop(0, '#c8c4bc');
+    bolt.addColorStop(1, '#4a4642');
+    h.fillStyle = bolt;
+    h.beginPath(); h.arc(bx, 32, 7, 0, Math.PI * 2); h.fill();
+  }
+  h.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  h.fillRect(0, 0, 256, 3);
+  h.fillRect(0, 61, 256, 3);
+  // blankes, verkratztes Blech
+  h.fillStyle = '#56575a';
+  h.fillRect(0, 64, 256, 64);
+  for (let i = 0; i < 120; i++) {
+    h.strokeStyle = r() < 0.6 ? `rgba(200, 200, 205, ${0.08 + r() * 0.15})` : `rgba(20, 20, 22, ${0.1 + r() * 0.2})`;
+    h.lineWidth = 0.6 + r();
+    const x = r() * 256, y = 64 + r() * 64, l = 6 + r() * 40, a = (r() - 0.5) * 0.4;
+    h.beginPath(); h.moveTo(x, y); h.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); h.stroke();
+  }
+  for (let i = 0; i < 25; i++) {
+    h.fillStyle = `rgba(120, 58, 22, ${0.2 + r() * 0.35})`;
+    h.beginPath(); h.ellipse(r() * 256, 64 + r() * 64, 1 + r() * 5, 1 + r() * 3, r() * 3, 0, Math.PI * 2); h.fill();
+  }
+  const steel = new THREE.CanvasTexture(s);
+  steel.colorSpace = THREE.SRGBColorSpace;
+  steel.anisotropy = 8;
+  return { concrete, steel };
+}
 
 export const backWallTexture = () => canvasTexture(128, (g, s, r) => {
   g.fillStyle = '#3a2418';
