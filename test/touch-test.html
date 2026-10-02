@@ -64,8 +64,21 @@ try {
   padAt('pointerdown', 0.8, 0);
   ok(dirs() === '-', 'Steuerkreuz während der Pause ohne Wirkung');
   padAt('pointerup', 0.8, 0);
-  $('resumeBtn').click();
-  ok(!visible('pauseScreen'), 'Weiter');
+
+  // Leertaste links: sichtbar über dem Pausemenü, bestätigt die Vorauswahl ("Weiter") wie die echte Taste
+  const sp = $('touchSpace'), sr = sp.getBoundingClientRect();
+  ok(sr.width > 0 && sr.right < frame.clientWidth / 2, 'Leertasten-Knopf sichtbar auf der linken Seite');
+  const hit = frame.contentDocument.elementFromPoint(sr.left + sr.width / 2, sr.top + sr.height / 2);
+  ok(sp.contains(hit), 'Leertasten-Knopf liegt über dem Pausemenü');
+  const keys = [];
+  const spy = (e) => keys.push(e.type + ':' + e.code);
+  W().addEventListener('keydown', spy); W().addEventListener('keyup', spy);
+  ptr(sp, 'pointerdown', 0, 0);
+  ok(sp.classList.contains('on'), 'Leertasten-Knopf leuchtet beim Drücken');
+  ptr(sp, 'pointerup', 0, 0);
+  W().removeEventListener('keydown', spy); W().removeEventListener('keyup', spy);
+  ok(keys.join() === 'keydown:Space,keyup:Space', 'Knopf sendet Leertaste drücken/loslassen: ' + keys.join());
+  ok(!visible('pauseScreen'), 'Leertaste bestätigt "Weiter" im Pausemenü');
 
   // Tastatur blendet die Touch-Steuerung aus, Berührung wieder ein (ohne ?touch)
   await open('autostart');
@@ -74,6 +87,8 @@ try {
   ok(!touchOn(), 'Am PC ohne Touch: Steuerung ausgeblendet');
   ptr($('view'), 'pointerdown', 10, 10);
   ok(touchOn(), 'Berührung blendet sie ein');
+  ptr($('touchSpace'), 'pointerdown', 0, 0); ptr($('touchSpace'), 'pointerup', 0, 0);
+  ok(touchOn(), 'Leertasten-Knopf lässt sie eingeblendet');
   W().dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ' }));
   ok(!touchOn(), 'Taste blendet sie wieder aus');
 } catch (e) {

@@ -32,6 +32,7 @@ export default {
   saveInfo: (when, cash, level) => `Saved game from ${when} · ${cash} · Level ${level}`,
   volumeTitle: 'Volume',
   pauseTitle: 'Pause',
+  spaceTitle: 'Space',
   musicLabel: 'MUSIC',
   sfxLabel: 'EFFECTS',
   musicMuteTitle: 'Music on/off (N)',

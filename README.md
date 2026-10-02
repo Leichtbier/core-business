@@ -47,7 +47,7 @@ The money also applies after "New Game".
 | `src/render.js` | three.js scene: instanced blocks, pod model, lighting by depth |
 | `src/ui.js` | HUD and shop interfaces (every action is a button with a fixed `data-nav` key, default selection in `shopDefault()`) |
 | `src/nav.js` | Keyboard control of all menus, dialogs and shops: arrow keys/WASD select spatially, Enter/Space triggers, Esc goes back, Tab cycles in order; the topmost visible interface is active |
-| `src/touch.js` | Tablet/smartphone controls: d-pad at the bottom right (eight directions), tap item slots to use them, pause button; shown only in touch mode (on with the first touch, off with the first key press, `?touch` forces it) |
+| `src/touch.js` | Tablet/smartphone controls: d-pad at the bottom right (eight directions), tap item slots to use them, pause button, space-bar button on the left; shown only in touch mode (on with the first touch, off with the first key press, `?touch` forces it) |
 | `style.css` | UI in the style of the game world: brushed sheet metal with rivets, hazard stripes, headings as neon lettering in the sign color of the respective building (`--accent`), numbers as LCD |
 | `src/main.js` | Input, fixed 42 Hz loop with interpolated rendering |
 | Billboard (`buildBillboard` in `src/render.js`, poster `billboardTexture` in `src/textures.js`) | "MARS NEEDS MINERS!" between the upgrade shop and the repair shop, a good 10 tiles behind the play plane: a Husk Heavy Industries recruitment poster in the style of old propaganda, Mr. Husk pointing at the viewer (rendered from the portrait model at load time, `Portrait3D.snapshotRecruiter`, pose `RECRUITER_POSE`), lit by floodlights at night |
@@ -92,7 +92,7 @@ The money also applies after "New Game".
 | `src/save.js` | Save game in the browser (`localStorage`, one slot like the original's SharedObject) |
 | `assets/save_pod.py` → `assets/save_pod.glb` | Save pod above the surface (glass dome, hatch `Hatch_L/R` opens on approach, sign `SignGlow`, hover thruster `ThrusterGlow`) |
 | `test/save-test.html` | End-to-end: save, overwrite, decline, load (backs up an existing save game and restores it) |
-| `test/touch-test.html` | Touch controls: d-pad directions and dead zone, item slots, pause, tapping through a transmission, touch mode on/off |
+| `test/touch-test.html` | Touch controls: d-pad directions and dead zone, item slots, pause, space-bar button, tapping through a transmission, touch mode on/off |
 | `test/nav-test.html` | Keyboard-only operation: default selection per shop, arrow keys, Enter, Esc, Q/E, pause, start menu |
 | `test/sim-test.html` | Headless test of the game logic (result in the DOM) |
 | `test/death-test.html` | Checks that death and teleport don't recompile shaders (otherwise the game stutters briefly); the pod lights therefore always stay in the scene |
@@ -195,7 +195,8 @@ confirm, <kbd>Esc</kbd> goes back or leaves the shop. The most obvious action is
 
 On touch devices a d-pad appears at the bottom right: the finger's direction from the center steers (diagonals
 combine flying and moving sideways, the center is a dead zone, the finger may leave the circle). Tap an item slot
-to use the item, the button above the d-pad pauses. Menus, shops and dialogs are operated by tapping their buttons;
+to use the item, the button above the d-pad pauses. The round button on the left edge acts as the space bar (it stays
+on top of menus and dialogs, so it confirms the preselected button there). Menus, shops and dialogs are operated by tapping their buttons;
 tapping a transmission works like a key press. Landscape is recommended.
 
 ## Saving (as in the original)

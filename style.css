@@ -247,7 +247,14 @@ body.touch .hudbottom { flex-wrap: wrap; max-width: calc(100% - var(--pad, 168px
   background: radial-gradient(circle at 40% 35%, #5a5048, #2a2420); border: 1px solid #6a5c50;
   box-shadow: 0 3px 8px rgba(0,0,0,0.6); pointer-events: none; }
 #touchPad.held #touchKnob { border-color: var(--accent); box-shadow: 0 0 0 1px #000, 0 0 12px var(--glow); }
-@media (max-height: 480px), (max-width: 480px) { body.touch .touchui { --pad: 132px; } body.touch .hudbottom { --pad: 132px; } }
+/* Leertaste: links auf halber Höhe, über Menüs und Funksprüchen (bestätigt dort die Auswahl) */
+#touchSpace { display: none; }
+body.touch #touchSpace { display: flex; align-items: center; justify-content: center; position: fixed; z-index: 40;
+  left: calc(16px + env(safe-area-inset-left)); top: 50%; transform: translateY(-50%); width: 76px; height: 76px; padding: 0;
+  border-radius: 50%; touch-action: none; }
+#touchSpace.on { color: #120c06; border-color: var(--accent); background: var(--accent); box-shadow: 0 0 12px var(--glow); }
+@media (max-height: 480px), (max-width: 480px) { body.touch .touchui { --pad: 132px; } body.touch .hudbottom { --pad: 132px; }
+  body.touch #touchSpace { width: 60px; height: 60px; } }
 
 #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: screen; }
 #flash.go { animation: flash 0.7s ease-out; }

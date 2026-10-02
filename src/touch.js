@@ -1,5 +1,5 @@
 // Steuerung für Tablet und Smartphone: Steuerkreuz unten rechts, Items durch Antippen der Item-Leiste,
-// Pause-Knopf über dem Steuerkreuz. Menüs, Shops und Dialoge bedient man ohnehin durch Antippen der Knöpfe.
+// Pause-Knopf über dem Steuerkreuz, Leertasten-Knopf am linken Rand. Menüs, Shops und Dialoge bedient man ohnehin durch Antippen der Knöpfe.
 // Sichtbar ist das alles nur im Touch-Modus (Klasse "touch" am <body>): an, sobald ein Finger den Bildschirm
 // berührt (oder das Gerät nur Touch kennt), aus bei der ersten Taste auf einer Tastatur.
 //
@@ -19,7 +19,8 @@ export function setupTouch({ input, canSteer, useItem, pause, wake, force = fals
   const setTouch = (on) => body.classList.toggle('touch', on);
   setTouch(force || matchMedia('(hover: none) and (pointer: coarse)').matches);
   window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') setTouch(true); }, true);
-  window.addEventListener('keydown', () => { if (!force) setTouch(false); }, true);
+  let emulating = false; // eigene Tastenereignisse des Leertasten-Knopfs schalten den Touch-Modus nicht aus
+  window.addEventListener('keydown', () => { if (!force && !emulating) setTouch(false); }, true);
 
   const pad = $('touchPad'), knob = $('touchKnob');
   const arrows = Object.fromEntries(['up', 'down', 'left', 'right'].map((k) => [k, pad.querySelector('.' + k)]));
@@ -80,4 +81,31 @@ export function setupTouch({ input, canSteer, useItem, pause, wake, force = fals
   });
 
   $('touchPause').addEventListener('click', (e) => { e.currentTarget.blur(); pause(); });
+
+  // Leertaste: Drücken und Loslassen des Knopfs gehen als Tastenereignisse ans Fenster und wirken damit
+  // genau wie die echte Taste (z. B. Auswahl in Menüs bestätigen, Funkspruch weiterschalten)
+  const space = $('touchSpace');
+  const key = (type) => {
+    emulating = true;
+    try { window.dispatchEvent(new KeyboardEvent(type, { code: 'Space', key: ' ', bubbles: true, cancelable: true })); }
+    finally { emulating = false; }
+  };
+  let spaceFinger = null;
+  space.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    wake();
+    if (spaceFinger !== null) return;
+    spaceFinger = e.pointerId;
+    try { space.setPointerCapture(e.pointerId); } catch { /* künstliche Ereignisse (Tests) */ }
+    space.classList.add('on');
+    key('keydown');
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    space.addEventListener(type, (e) => {
+      if (e.pointerId !== spaceFinger) return;
+      spaceFinger = null;
+      space.classList.remove('on');
+      key('keyup');
+    });
+  }
 }
