@@ -5,7 +5,6 @@ const HUSK = 'Mr. Husk', UNKNOWN = 'Unbekannte Quelle', MINER = 'Mars-Grabpod #3
 
 export default {
   locale: 'de-DE',
-  langButton: 'SPRACHE: DEUTSCH',
 
   // Ladebildschirm
   loading: 'Lade Modelle und Sounds …',
@@ -16,7 +15,7 @@ export default {
   // Startbildschirm
   tagline: 'Eine three.js-Neuauflage von Motherload, dem Flash-Klassiker von XGen Studios',
   start: 'SPIEL STARTEN',
-  load: 'SPIEL LADEN',
+  load: 'SPIEL FORTSETZEN',
   keysDrive: 'Fahren · seitwärts bohren · fliegen',
   keysUp: 'Rotor: abheben und fliegen',
   keysDown: 'Nach unten bohren',
@@ -26,7 +25,7 @@ export default {
   keysSave: 'Spielstand speichern: den schwebenden Save-Pod über der Oberfläche anfliegen',
   intro: 'Grabe Mineralien aus, verkaufe sie an der Oberfläche, tanke nach und rüste deinen Pod auf. '
     + 'Nach oben bohren geht nicht. Behalte Tank und Hülle im Blick!',
-  startHints: '<span><kbd>↑</kbd><kbd>↓</kbd> Auswahl</span><span><kbd>Enter</kbd> bestätigen</span><span><kbd>L</kbd> laden</span>',
+  startHints: '<span><kbd>↑</kbd><kbd>↓</kbd> Auswahl</span><span><kbd>Enter</kbd> bestätigen</span><span><kbd>L</kbd> fortsetzen</span>',
   noSave: 'Kein gespeicherter Spielstand vorhanden!',
   saveInfo: (when, cash, level) => `Gespeicherter Spielstand vom ${when} · ${cash} · Level ${level}`,
   volumeTitle: 'Lautstärke',

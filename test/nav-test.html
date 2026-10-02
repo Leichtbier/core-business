@@ -98,16 +98,21 @@ try {
   ok(!$('scenarioBtn') && !$('scenarioScreen'), 'Ohne Testmodus: kein Knopf "Testszenarien"');
   ok(!visible('hud') && frame.contentWindow.ml3d.game.cash !== 12345, 'Ohne Testmodus: Test-Parameter werden ignoriert');
   await key('ArrowDown'); await key('ArrowDown'); await key('ArrowDown');
-  ok(sel('startScreen') === 'langBtn', 'Ohne Testmodus: Pfeil runter endet beim Sprachknopf (' + sel('startScreen') + ')');
-  // Sprache umschalten: Texte wechseln sofort, zweimal umschalten stellt den alten Stand wieder her
+  ok(['langEn', 'langDe'].includes(sel('startScreen')), 'Ohne Testmodus: Pfeil runter endet bei den Flaggen (' + sel('startScreen') + ')');
+  // Sprache wählen: Flagge links Englisch, rechts Deutsch; Texte wechseln sofort, die gewählte Flagge ist markiert
   const label = () => $('startBtn').textContent, langBefore = frame.contentWindow.localStorage.getItem('ml3d.lang');
-  const text0 = label();
+  await key('ArrowRight');
+  ok(sel('startScreen') === 'langDe', 'Pfeil rechts: deutsche Flagge');
   await key('Enter');
-  const text1 = label();
-  ok(text1 !== text0 && ['START GAME', 'SPIEL STARTEN'].includes(text1), 'Sprachknopf: ' + text0 + ' → ' + text1);
+  ok(label() === 'SPIEL STARTEN' && $('loadBtn').textContent === 'SPIEL FORTSETZEN', 'Deutsch: ' + label() + ' / ' + $('loadBtn').textContent);
+  ok($('langDe').classList.contains('active') && !$('langEn').classList.contains('active'), 'Deutsche Flagge markiert');
+  await key('ArrowLeft');
+  ok(sel('startScreen') === 'langEn', 'Pfeil links: englische Flagge');
   await key('Enter');
-  ok(label() === text0, 'Sprachknopf zurück: ' + label());
+  ok(label() === 'START GAME' && $('loadBtn').textContent === 'CONTINUE GAME', 'Englisch: ' + label() + ' / ' + $('loadBtn').textContent);
+  ok($('langEn').classList.contains('active') && !$('langDe').classList.contains('active'), 'Englische Flagge markiert');
   if (langBefore === null) frame.contentWindow.localStorage.removeItem('ml3d.lang');
+  else frame.contentWindow.localStorage.setItem('ml3d.lang', langBefore);
 } catch (e) {
   log.push('EXCEPTION ' + e.stack);
 }

@@ -8,7 +8,7 @@ import { Portrait3D } from './portrait3d.js';
 import { readSave } from './save.js';
 import { nav } from './nav.js';
 import { devParams } from './dev.js';
-import { t, setLang, nextLang, applyStatic, mineralName, itemName } from './i18n.js';
+import { t, setLang, applyStatic, mineralName, itemName } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 applyStatic(); // Texte der Oberfläche in der gewählten Sprache (im HTML steht Englisch)
@@ -281,8 +281,10 @@ function showSaveInfo() {
   $('loadInfo').textContent = t('saveInfo', when, cash, Math.trunc(save.data[3]) || 1);
 }
 showSaveInfo();
-// Sprache umschalten (Englisch/Deutsch), gilt sofort und bleibt im Browser gespeichert
-$('langBtn').addEventListener('click', () => { setLang(nextLang()); showSaveInfo(); });
+// Sprache wählen (Flaggen Englisch/Deutsch), gilt sofort und bleibt im Browser gespeichert
+for (const b of document.querySelectorAll('[data-lang]')) {
+  b.addEventListener('click', () => { setLang(b.dataset.lang); showSaveInfo(); });
+}
 
 // Nach dem Sieg: wie im Original erst die Frage nach dem Speichern (Spielzeit der Runde beginnt neu),
 // dann die neue Runde auf höherem Level mit neuem Abwurf

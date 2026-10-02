@@ -31,8 +31,6 @@ export function setLang(l) {
   applyStatic();
 }
 
-export const nextLang = () => (lang === 'en' ? 'de' : 'en');
-
 // Namen aus src/constants.js in der gewählten Sprache (Index wie MINERALS, ITEMS, UPGRADES[cat].names)
 export const mineralName = (i) => t('minerals')[i];
 export const itemName = (i) => t('items')[i].name;
@@ -46,4 +44,5 @@ export function applyStatic(root = document) {
   for (const el of root.querySelectorAll('[data-i18n]')) el.innerHTML = t(el.dataset.i18n);
   for (const el of root.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
   for (const el of root.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  for (const el of root.querySelectorAll('[data-lang]')) el.classList.toggle('active', el.dataset.lang === lang);
 }

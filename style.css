@@ -127,6 +127,12 @@ button.sel, label.opt.sel { color: #120c06; border-color: var(--accent);
 .menu { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 16px auto 8px; max-width: 320px; }
 .menu button { width: 100%; font-size: 17px; padding: 11px 18px; }
 .menu button.sel::before { content: '\25B6\00A0'; font-size: 0.75em; vertical-align: 1px; }
+/* Sprachwahl: zwei Flaggen nebeneinander, die gewählte Sprache ist umrandet */
+.menu .langs { display: flex; gap: 8px; width: 100%; margin-top: 18px; }
+.menu .langs button { flex: 1; padding: 8px; line-height: 0; }
+.menu .langs button.sel::before { content: none; }
+.menu .langs button.active:not(.sel) { border-color: var(--accent); box-shadow: 0 0 10px var(--glow); }
+.menu .langs svg { box-shadow: 0 0 0 1px #000; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
 
 /* ---------------------------------------------------------------- Shops */

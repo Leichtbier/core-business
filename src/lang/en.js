@@ -7,7 +7,6 @@ const HUSK = 'Mr. Husk', UNKNOWN = 'Unknown source', MINER = 'Mars Mining Pod #3
 
 export default {
   locale: 'en-US',
-  langButton: 'LANGUAGE: ENGLISH',
 
   // Ladebildschirm
   loading: 'Loading models and sounds …',
@@ -18,7 +17,7 @@ export default {
   // Startbildschirm
   tagline: 'A three.js remake of Motherload, the Flash classic by XGen Studios',
   start: 'START GAME',
-  load: 'LOAD GAME',
+  load: 'CONTINUE GAME',
   keysDrive: 'Drive · drill sideways · fly',
   keysUp: 'Rotor: take off and fly',
   keysDown: 'Drill down',
@@ -28,7 +27,7 @@ export default {
   keysSave: 'Save the game: fly into the hovering save pod above the surface',
   intro: 'Dig up minerals, sell them at the surface, refuel and upgrade your pod. '
     + 'You can\'t drill upward. Keep an eye on fuel and hull!',
-  startHints: '<span><kbd>↑</kbd><kbd>↓</kbd> select</span><span><kbd>Enter</kbd> confirm</span><span><kbd>L</kbd> load</span>',
+  startHints: '<span><kbd>↑</kbd><kbd>↓</kbd> select</span><span><kbd>Enter</kbd> confirm</span><span><kbd>L</kbd> continue</span>',
   noSave: 'No saved game found!',
   saveInfo: (when, cash, level) => `Saved game from ${when} · ${cash} · Level ${level}`,
   volumeTitle: 'Volume',
