@@ -316,8 +316,9 @@ $('restartBtn').addEventListener('click', () => { running = true; start(); });
 $('deathLoadBtn').addEventListener('click', () => { const save = readSave(); if (save) start(save); });
 $('resumeBtn').addEventListener('click', () => setPaused(false));
 
-// Tablet/Smartphone: Steuerkreuz, Items antippen, Pause (?touch zeigt die Steuerung auch am PC)
-setupTouch({
+// Tablet/Smartphone: Steuerkreuz (PWM, touch.tick vor jedem Spielschritt), Items antippen, Pause
+// (?touch zeigt die Steuerung auch am PC)
+const touch = setupTouch({
   input,
   canSteer: () => running && !userPaused && !held && !game.dead && !nav.active() && !ui.transmissionOpen,
   useItem: (i) => game.useItem(i),
@@ -325,6 +326,7 @@ setupTouch({
   wake: () => { if (running) sfx.init(); },
   force: devParams().has('touch'),
 });
+window.ml3d.touch = touch; // für test/touch-test.html
 
 // Tastatursteuerung der Menüs: Vorauswahl ist jeweils die naheliegendste Aktion
 nav.register($('startScreen'), {
@@ -337,6 +339,7 @@ nav.register($('deathScreen'), { initial: () => (readSave() ? 'deathLoadBtn' : '
 // ---------- Hauptschleife: feste 42 Hz Simulation, Darstellung interpoliert ----------
 const STEP = 1 / FPS;
 let acc = 0;
+let engineLoad = 100; // geglättete game.engineLoad
 let last = performance.now();
 game.pod.prevX = game.pod.x;
 game.pod.prevY = game.pod.y;
@@ -349,7 +352,10 @@ function loop(now) {
     while (acc >= STEP) {
       game.pod.prevX = game.pod.x;
       game.pod.prevY = game.pod.y;
+      touch.tick();
       game.step();
+      // Motorlast für den Ton glätten: Beim gepulsten Steuerkreuz springt sie sonst von Schritt zu Schritt
+      engineLoad += (game.engineLoad - engineLoad) * 0.25;
       game.tickTime();
       if (game.pod.dig && game.frame % 4 === 0) {
         const p = game.pod;
@@ -367,7 +373,7 @@ function loop(now) {
   const fuelPct = game.pod.fuel / game.fuelCap;
   sfx.updateFuelWarning(!playing ? 0 : game.fuelEmptyFrames > 0 ? 2 : fuelPct < 0.15 ? 1 : 0);
   const m = game.pod.mod;
-  sfx.updateEngine(running && !userPaused && !game.paused && !game.dead, game.engineLoad,
+  sfx.updateEngine(running && !userPaused && !game.paused && !game.dead, engineLoad,
     m === 'air' || m === 'launching' || m === 'digdownlaunching');
   // Musik: jeder Shop mit eigenem Stück (ohne eigenes Stück: leiseres Hauptthema), Pause stumm;
   // unterhalb von DEEP_MUSIC_FT läuft das Tiefenthema statt des Hauptthemas

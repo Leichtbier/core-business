@@ -5,7 +5,7 @@
 <pre id="out">läuft…</pre>
 <iframe id="f" width="900" height="420"></iframe>
 <script type="module">
-// Tablet/Smartphone (src/touch.js): Steuerkreuz setzt die Richtungen (acht Sektoren, Ruhezone in der Mitte),
+// Tablet/Smartphone (src/touch.js): Steuerkreuz setzt die Richtungen (zwei Achsen mit PWM, Ruhezone in der Mitte),
 // Antippen der Item-Leiste nutzt ein Item, Pause-Knopf, Funkspruch per Antippen, Touch-Modus an/aus.
 const log = [];
 const ok = (cond, msg) => log.push((cond ? 'OK   ' : 'FAIL ') + msg);
@@ -37,19 +37,53 @@ try {
   for (let i = 0; i < 5 && visible('transmission'); i++) { $('transMsg').click(); await sleep(300); }
   ok(!visible('transmission') && !W().ml3d.game.paused, 'Funkspruch per Antippen geschlossen');
 
+  // Richtungen: eine neu einsetzende Richtung wirkt gleich im nächsten Spielschritt (tick)
+  const touch = () => W().ml3d.touch;
   const cases = [
     [[0.8, 0], 'right'], [[-0.8, 0], 'left'], [[0, -0.8], 'up'], [[0, 0.8], 'down'],
     [[0.6, -0.6], 'right+up'], [[-0.6, 0.6], 'left+down'], [[0.8, -0.2], 'right'], [[0.1, 0.1], '-'], [[2, 0], 'right'],
+    [[0.15, -0.8], 'up'], [[0, 0.4], '-'],
   ];
   padAt('pointerdown', 0, 0);
+  touch().tick();
   ok(dirs() === '-' && $('touchPad').classList.contains('held'), 'Finger in der Mitte: keine Richtung');
   for (const [[dx, dy], want] of cases) {
     padAt('pointermove', dx, dy);
+    touch().tick();
     ok(dirs() === want, `Finger bei (${dx}, ${dy}): ${dirs()}` + (dirs() === want ? '' : ' statt ' + want));
   }
+
+  // PWM: Anteil der gedrückten Schritte entspricht dem Tastgrad, fein verteilt (keine langen Pausen/Blöcke)
+  for (const [dx, dy, k] of [[0.45, 0, 'right'], [-0.6, 0, 'left'], [0, -0.35, 'up'], [0, -0.7, 'up']]) {
+    padAt('pointermove', dx, dy);
+    const d = touch().duty()[k], N = 420;
+    let on = 0, runOn = 0, runOff = 0, maxOn = 0, maxOff = 0;
+    for (let i = 0; i < N; i++) {
+      touch().tick();
+      const p = W().ml3d.game.input[k];
+      if (p) on++;
+      if (p) { runOn++; runOff = 0; } else { runOff++; runOn = 0; }
+      maxOn = Math.max(maxOn, runOn); maxOff = Math.max(maxOff, runOff);
+    }
+    const share = on / N;
+    ok(d > 0.02 && d < 0.98 && Math.abs(share - d) <= 1.5 / N, `Tastgrad ${k} bei (${dx}, ${dy}): soll ${d.toFixed(3)}, ist ${share.toFixed(3)}`);
+    ok(maxOn <= Math.ceil(d / (1 - d)) + 1 && maxOff <= Math.ceil((1 - d) / d) + 1, `Gleichmäßig verteilt: längstens ${maxOn} an, ${maxOff} aus`);
+  }
+  padAt('pointermove', 0.3, 0);
+  const small = touch().duty().right;
+  padAt('pointermove', 0.84, 0);
+  ok(small > 0 && small < 0.05 && touch().duty().right > 0.95, `Kennlinie: knapp über der Ruhezone ${small.toFixed(3)}, am Rand ${touch().duty().right.toFixed(3)}`);
+  padAt('pointermove', 2, 0);
+  touch().tick();
   ok($('touchPad').querySelector('.right').classList.contains('on'), 'Pfeil der aktiven Richtung leuchtet');
   padAt('pointerup', 2, 0);
   ok(dirs() === '-' && !$('touchPad').classList.contains('held'), 'Loslassen: Pod ruht');
+
+  // Tastatur funktioniert weiter, solange kein Finger auf dem Steuerkreuz liegt
+  W().ml3d.game.input.left = true;
+  touch().tick();
+  ok(W().ml3d.game.input.left, 'Ohne Finger lässt tick() die Tastatureingabe in Ruhe');
+  W().ml3d.game.input.left = false;
 
   // Item antippen: Reservetank (Feld 0)
   await sleep(1500); // Abklingzeit der Items
@@ -62,6 +96,7 @@ try {
   $('touchPause').click();
   ok(visible('pauseScreen'), 'Pause-Knopf öffnet die Pause');
   padAt('pointerdown', 0.8, 0);
+  touch().tick();
   ok(dirs() === '-', 'Steuerkreuz während der Pause ohne Wirkung');
   padAt('pointerup', 0.8, 0);
 
