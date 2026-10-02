@@ -60,7 +60,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .money { position: absolute; top: 14px; right: 16px; text-align: right; padding: 8px 12px; }
 .cash { font-size: 24px; display: inline-block; }
 .score { color: var(--muted); font-size: 13px; margin-top: 4px; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
-.depth { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 22px;
+.depth { font-family: var(--mono); font-size: 22px;
   font-weight: bold; padding: 4px 16px; color: #ffc45a; text-shadow: 0 0 6px rgba(255,180,60,0.6); font-variant-numeric: tabular-nums; }
 .warn { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); color: var(--bad); font-weight: bold;
   font-size: 28px; letter-spacing: 3px; text-shadow: 0 0 12px rgba(255,60,40,0.8), 0 2px 0 #000; animation: blink 0.6s steps(2) infinite; }
@@ -213,7 +213,9 @@ button.up.sel .name { color: var(--accent); text-shadow: 0 0 6px var(--glow); }
 #loadInfo.bad { color: var(--bad); }
 
 /* Items: Leiste im HUD, Teleport-Blitz */
-.itembar { position: absolute; bottom: 14px; left: 14px; display: flex; gap: 6px; }
+/* unten links: Item-Leiste, rechts daneben die Tiefe (unten bündig, etwas mehr Abstand als zwischen den Items) */
+.hudbottom { position: absolute; bottom: 14px; left: 14px; display: flex; align-items: flex-end; gap: 14px; }
+.itembar { display: flex; gap: 6px; }
 .itembar .slot { position: relative; width: 58px; height: 58px; border-radius: 3px; border: 1px solid var(--edge);
   background: linear-gradient(var(--steel-hi), var(--steel-lo)); box-shadow: inset 0 0 8px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.5); }
 .itembar .slot img { width: 100%; height: 100%; object-fit: contain; }
