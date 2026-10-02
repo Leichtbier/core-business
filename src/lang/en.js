@@ -31,6 +31,7 @@ export default {
   noSave: 'No saved game found!',
   saveInfo: (when, cash, level) => `Saved game from ${when} · ${cash} · Level ${level}`,
   volumeTitle: 'Volume',
+  pauseTitle: 'Pause',
   musicLabel: 'MUSIC',
   sfxLabel: 'EFFECTS',
   musicMuteTitle: 'Music on/off (N)',

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Core Business</title>
   <link rel="stylesheet" href="style.css">
   <script type="importmap">
@@ -38,6 +38,19 @@
     <div class="hudbottom">
       <div id="itemBar" class="itembar"></div>
       <div id="depthText" class="depth plate"></div>
+    </div>
+    <!-- Tablet/Smartphone (src/touch.js): Steuerkreuz unten rechts, darüber Pause; nur im Touch-Modus sichtbar -->
+    <div class="touchui">
+      <button id="touchPause" class="nonav" tabindex="-1" data-i18n-title="pauseTitle" data-i18n-aria="pauseTitle">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg></button>
+      <div id="touchPad">
+        <svg viewBox="-50 -50 100 100">
+          <circle class="ring" r="48"/>
+          <path class="up" d="M0,-41L9,-29H-9Z"/><path class="down" d="M0,41L9,29H-9Z"/>
+          <path class="left" d="M-41,0L-29,9V-9Z"/><path class="right" d="M41,0L29,9V-9Z"/>
+        </svg>
+        <div id="touchKnob"></div>
+      </div>
     </div>
     <div id="bossBar" class="bossbar plate hidden">
       <div class="bossName" id="bossName"></div>

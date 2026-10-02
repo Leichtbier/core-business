@@ -224,6 +224,31 @@ button.up.sel .name { color: var(--accent); text-shadow: 0 0 6px var(--glow); }
   background: rgba(0,0,0,0.6); padding: 0 3px; border-radius: 2px; }
 .itembar .count { position: absolute; bottom: 1px; right: 4px; font-family: var(--mono); font-size: 14px; font-weight: bold;
   text-shadow: 0 1px 2px #000, 0 0 4px #000; font-variant-numeric: tabular-nums; }
+/* Tablet/Smartphone (src/touch.js): nur mit body.touch sichtbar */
+.touchui { display: none; }
+body.touch { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+body.touch #view { touch-action: none; }
+body.touch .touchui { display: block; position: absolute; right: calc(16px + env(safe-area-inset-right)); bottom: 14px;
+  --pad: 168px; width: var(--pad); pointer-events: auto; }
+body.touch .itembar .slot { pointer-events: auto; cursor: pointer; touch-action: none; }
+body.touch .itembar { flex-wrap: wrap; }
+body.touch .itembar .key { display: none; }
+/* Item-Leiste und Tiefe weichen dem Steuerkreuz aus (notfalls rutscht die Tiefe in eine zweite Zeile) */
+body.touch .hudbottom { flex-wrap: wrap; max-width: calc(100% - var(--pad, 168px) - 60px); left: calc(14px + env(safe-area-inset-left)); }
+#touchPause { display: flex; align-items: center; justify-content: center; margin: 0 0 12px auto; padding: 8px 11px; }
+#touchPad { position: relative; width: var(--pad); height: var(--pad); border-radius: 50%; touch-action: none;
+  background: radial-gradient(circle, rgba(30,26,22,0.55) 0 58%, rgba(15,12,10,0.7) 70%);
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 2px var(--edge), 0 6px 18px rgba(0,0,0,0.5); }
+#touchPad svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#touchPad .ring { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 1; }
+#touchPad path { fill: rgba(232,220,200,0.45); transition: fill 0.08s; }
+#touchPad path.on { fill: var(--accent); filter: drop-shadow(0 0 4px var(--glow)); }
+#touchKnob { position: absolute; left: 50%; top: 50%; width: 40%; height: 40%; margin: -20% 0 0 -20%; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #5a5048, #2a2420); border: 1px solid #6a5c50;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.6); pointer-events: none; }
+#touchPad.held #touchKnob { border-color: var(--accent); box-shadow: 0 0 0 1px #000, 0 0 12px var(--glow); }
+@media (max-height: 480px), (max-width: 480px) { body.touch .touchui { --pad: 132px; } body.touch .hudbottom { --pad: 132px; } }
+
 #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: screen; }
 #flash.go { animation: flash 0.7s ease-out; }
 @keyframes flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
@@ -326,6 +351,8 @@ label.opt input { accent-color: var(--accent); margin: 0 6px 0 0; vertical-align
   .gauge { grid-template-columns: 44px 100px auto; }
   .panel h1 { font-size: 34px; }
   .itembar .slot { width: 44px; height: 44px; }
+  /* schmal: Lautstärke unter die Geldanzeige statt daneben (sonst stößt sie an die Tankanzeige) */
+  #volume { right: 16px; top: calc(14px + var(--money-h, 0px)); }
   .transBody { grid-template-columns: 1fr; }
   .transAvatar { margin: 0 auto; }
 }

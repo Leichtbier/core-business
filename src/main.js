@@ -8,6 +8,7 @@ import { Portrait3D } from './portrait3d.js';
 import { readSave } from './save.js';
 import { nav } from './nav.js';
 import { devParams } from './dev.js';
+import { setupTouch } from './touch.js';
 import { t, setLang, applyStatic, mineralName, itemName } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -231,10 +232,12 @@ for (const k of ['music', 'sfx']) {
     e.currentTarget.blur();
   });
 }
-// Platz der Geldanzeige freihalten: ihre Breite plus Abstand (versteckt 0, dann sitzt das Symbol in der Ecke)
+// Platz der Geldanzeige freihalten: ihre Breite (bzw. auf schmalen Bildschirmen Höhe) plus Abstand
+// (versteckt 0, dann sitzt das Symbol in der Ecke)
 new ResizeObserver(([e]) => {
-  const w = e.target.offsetWidth;
-  document.documentElement.style.setProperty('--money-w', w ? w + 10 + 'px' : '0px');
+  const { offsetWidth: w, offsetHeight: h } = e.target, root = document.documentElement.style;
+  root.setProperty('--money-w', w ? w + 10 + 'px' : '0px');
+  root.setProperty('--money-h', h ? h + 8 + 'px' : '0px');
 }).observe(document.querySelector('.money'));
 // Klick daneben schließt die Regler
 window.addEventListener('pointerdown', (e) => { if (volumeOpen() && !$('volume').contains(e.target)) showVolume(false); });
@@ -312,6 +315,16 @@ setupScenarioMenu();
 $('restartBtn').addEventListener('click', () => { running = true; start(); });
 $('deathLoadBtn').addEventListener('click', () => { const save = readSave(); if (save) start(save); });
 $('resumeBtn').addEventListener('click', () => setPaused(false));
+
+// Tablet/Smartphone: Steuerkreuz, Items antippen, Pause (?touch zeigt die Steuerung auch am PC)
+setupTouch({
+  input,
+  canSteer: () => running && !userPaused && !held && !game.dead && !nav.active() && !ui.transmissionOpen,
+  useItem: (i) => game.useItem(i),
+  pause: () => { if (running && !game.dead && !nav.active()) setPaused(true); },
+  wake: () => { if (running) sfx.init(); },
+  force: devParams().has('touch'),
+});
 
 // Tastatursteuerung der Menüs: Vorauswahl ist jeweils die naheliegendste Aktion
 nav.register($('startScreen'), {

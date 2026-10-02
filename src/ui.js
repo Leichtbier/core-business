@@ -20,6 +20,8 @@ export class UI {
     this.upgradeTab = 'drill';
     $('shopExit').addEventListener('click', () => this.closeShop());
     $('transOk').addEventListener('click', () => this.transmissionKey(true));
+    // Antippen des Funkspruchs wirkt wie eine Taste (Text vervollständigen, dann schließen); Wischen scrollt nur
+    $('transmission').addEventListener('click', (e) => { if (!e.target.closest('#transOk')) this.transmissionKey(); });
     $('saveYes').addEventListener('click', () => this.confirmSave());
     $('saveNo').addEventListener('click', () => this.closeSave());
     $('saveOk').addEventListener('click', () => this.closeSave());

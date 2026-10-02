@@ -29,6 +29,7 @@ export default {
   noSave: 'Kein gespeicherter Spielstand vorhanden!',
   saveInfo: (when, cash, level) => `Gespeicherter Spielstand vom ${when} · ${cash} · Level ${level}`,
   volumeTitle: 'Lautstärke',
+  pauseTitle: 'Pause',
   musicLabel: 'MUSIK',
   sfxLabel: 'EFFEKTE',
   musicMuteTitle: 'Musik an/aus (N)',
