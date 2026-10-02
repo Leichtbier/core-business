@@ -244,9 +244,11 @@ label.opt input { accent-color: var(--accent); margin: 0 6px 0 0; vertical-align
 .scenarios .scn.sel { color: var(--text); background: linear-gradient(color-mix(in srgb, var(--accent) 18%, #2a2521), #191613); }
 .scenarios .scn.sel span { color: var(--text); }
 
-/* Lautstärke: Symbol immer sichtbar (auch über Menüs und Shops), Regler klappen darüber auf.
+/* Lautstärke: Symbol immer sichtbar (auch über Menüs und Shops), oben links neben der Geldanzeige (deren Breite
+   setzt src/main.js als --money-w, ohne HUD 0), Regler klappen darunter auf.
    Symbol: zwei Wellen = alles an, eine Welle = Musik oder Effekte stumm, Kreuz = alles stumm */
-#volume { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#volume { position: fixed; top: 14px; right: calc(16px + var(--money-w, 0px)); z-index: 50; display: flex; flex-direction: column-reverse;
+  align-items: flex-end; gap: 8px; transition: right 0.15s; }
 #volBtn, .volMute { display: flex; align-items: center; justify-content: center; }
 #volBtn { padding: 6px 9px; }
 #volBtn.open { border-color: var(--accent); box-shadow: 0 0 0 1px #000, 0 0 12px var(--glow); }

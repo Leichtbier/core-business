@@ -177,7 +177,7 @@ ui.onPurchase = () => sfx.playBuy();
 // Dynamit etwas heller und leiser, C4 tiefer und voll
 renderer.itemFx.onBlast = (id) => sfx.play('explosion', id === ITEM.C4 ? { rate: 0.85 } : { volume: 0.75, rate: 1.1 });
 
-// Lautstärke (unten rechts): das Symbol klappt Regler für Musik und Effekte auf, je mit Stummschalter;
+// Lautstärke (oben, links neben der Geldanzeige): das Symbol klappt Regler für Musik und Effekte auf, je mit Stummschalter;
 // Taste N schaltet die Musik stumm. Alles bleibt im Browser gespeichert.
 const VOLUME_KEY = 'ml3d.volume';
 const vol = { music: 1, sfx: 1, musicMuted: false, sfxMuted: false };
@@ -231,6 +231,11 @@ for (const k of ['music', 'sfx']) {
     e.currentTarget.blur();
   });
 }
+// Platz der Geldanzeige freihalten: ihre Breite plus Abstand (versteckt 0, dann sitzt das Symbol in der Ecke)
+new ResizeObserver(([e]) => {
+  const w = e.target.offsetWidth;
+  document.documentElement.style.setProperty('--money-w', w ? w + 10 + 'px' : '0px');
+}).observe(document.querySelector('.money'));
 // Klick daneben schließt die Regler
 window.addEventListener('pointerdown', (e) => { if (volumeOpen() && !$('volume').contains(e.target)) showVolume(false); });
 applyVolume();
