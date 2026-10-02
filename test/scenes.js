@@ -47,6 +47,13 @@ export const scenes = {
     Object.assign(game.pod, { x: 835, y: 0, xVel: 0, yVel: 0, mod: 'air', tread: false, facing: 'right', anim: null });
     game.buildingTimer = 16; // wie nach einer Weile an der Oberfläche
   },
+  // Gang in Reihe 12 über die ganze Kartenbreite, Pod in der Mitte; mit keys=right bzw. keys=left&warp=N
+  // fährt er bis an den Rand (Erreichbarkeit der äußeren Spalten, Kamera-Begrenzung)
+  edge(game) {
+    const w = game.world, p = game.pod;
+    for (let x = 0; x < 36; x++) for (let y = 8; y <= 16; y++) w.set(x, y, y === 12 ? 0 : 1 + ((x * 7 + y * 3) % 5));
+    Object.assign(p, { x: 17 * 50, y: 12 * 50 + 4.5, xVel: 0, yVel: 0, mod: 'ground', tread: true, facing: 'right', anim: null });
+  },
   // Tief unten (Reihe 450): gegrabene Gänge und eine Höhle neben ungegrabenem Erdreich
   deep(game) {
     const w = game.world, p = game.pod;

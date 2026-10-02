@@ -1329,15 +1329,30 @@ vec4 lavaCol;`)
     const lift = this.battleView ?? 0;
     const dist = this.camDist * (1 + 0.28 * lift);
     const tx = toX(px), ty = toY(py) + 1.7 * lift;
-    const halfH = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * dist;
-    const halfW = halfH * this.camera.aspect;
-    const minX = -0.5 + halfW * 0.8, maxX = EARTH_WIDTH - 0.5 - halfW * 0.8;
+    const halfW = this.viewHalfWidth(dist);
+    const minX = -0.5 + halfW, maxX = EARTH_WIDTH - 0.5 - halfW;
     const cx = minX < maxX ? Math.min(Math.max(tx, minX), maxX) : EARTH_WIDTH / 2;
     const k = snap ? 1 : 0.12;
     this.cam.x += (cx - this.cam.x) * k;
     this.cam.y += (ty - this.cam.y) * k;
     this.camera.position.set(this.cam.x, this.cam.y + dist * 0.16, dist);
     this.camera.lookAt(this.cam.x, this.cam.y + 0.2, 0);
+  }
+
+  // Halbe Sichtbreite auf Höhe der Vorderkante der Tiles (z = 0.5): der Fels außerhalb der Karte beginnt dort,
+  // bleibt so außerhalb des Bildes und verdeckt dahinter alles jenseits des Kartenrands. Die Kamera schaut leicht
+  // nach unten, daher hängt die Breite von der Bildhöhe ab – die breitere der beiden rechten Ecken zählt.
+  viewHalfWidth(dist) {
+    const c = this.camera, v = (this.edgeV ??= new THREE.Vector3());
+    c.position.set(0, dist * 0.16, dist);
+    c.lookAt(0, 0.2, 0);
+    c.updateMatrixWorld();
+    let half = 0;
+    for (const ny of [1, -1]) {
+      v.set(1, ny, 0.5).unproject(c).sub(c.position);
+      half = Math.max(half, c.position.x + v.x * (0.5 - c.position.z) / v.z);
+    }
+    return half;
   }
 
   updateLighting(game) {

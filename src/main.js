@@ -167,7 +167,7 @@ const events = {
 
 const game = new Game(input, events);
 const ui = new UI(game, renderer);
-window.ml3d = { game, ui }; // für die Tests in test/*.html (Zustand prüfen, ohne auf Animationsframes zu warten)
+window.ml3d = { game, ui, renderer }; // für die Tests in test/*.html (Zustand prüfen, ohne auf Animationsframes zu warten)
 const portrait = new Portrait3D(); // 3D-Brustbild für die Funksprüche
 ui.portrait = portrait;
 

@@ -44,9 +44,10 @@ export const GRAVITY = 9.81;
 export const FRICTION = 0.94;
 export const AIR_RESISTANCE = 0.98;
 
-// Bewegungsgrenzen des Pods in Weltkoordinaten (Original: earthMinX/earthMaxX + Bildschirm 0..550)
+// Bewegungsgrenzen des Pods in Weltkoordinaten: Mitte der ersten bis Mitte der letzten Tile-Spalte
+// (Original: earthMinX/earthMaxX + Bildschirm 0..550 – dort waren die letzten zwei Spalten unerreichbar)
 export const WORLD_MIN_X = 0;
-export const WORLD_MAX_X = (EARTH_WIDTH - 14) * TILE + 550;
+export const WORLD_MAX_X = (EARTH_WIDTH - 1) * TILE;
 
 // Welt-Y des Pods, bei dem der Höhenmesser 0 ft anzeigt: depth = int((204 - y) / 4)
 export const DEPTH_ZERO_Y = 204;
